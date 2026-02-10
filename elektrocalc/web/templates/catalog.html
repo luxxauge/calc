@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Artikel-Katalog</h1>
+
+<div class="card">
+  <h3>Import (Excel .xlsx)</h3>
+  <form method="post" action="/catalog/import/start" enctype="multipart/form-data">
+    <div class="row">
+      <div><label>Datei</label><br/><input type="file" name="file" accept=".xlsx" required/></div>
+      <div><label>Quelle/Notiz</label><br/><input name="source" placeholder="z.B. Großhandel XY Preisdatei"/></div>
+    </div>
+    <div style="margin-top:10px"><button type="submit">Weiter (Mapping)</button></div>
+  </form>
+  <p class="muted">Hinweis: CSV/GAEB/LV folgt danach. Erstmal Excel-Katalog als stabiler Baustein.</p>
+</div>
+
+<div class="card">
+  <h3>Liste</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Artikel-Nr</th><th>Name</th><th>Hersteller</th><th>Einheit</th><th>MwSt</th></tr></thead>
+    <tbody>
+      {% for it in items %}
+      <tr>
+        <td>{{it.id}}</td>
+        <td class="muted">{{it.article_no}}</td>
+        <td>{{it.name}}</td>
+        <td class="muted">{{it.manufacturer or ""}}</td>
+        <td class="muted">{{it.unit}}</td>
+        <td class="muted">{{it.vat_rate}}</td>
+      </tr>
+      {% endfor %}
+      {% if items|length==0 %}<tr><td colspan="6" class="muted">Noch keine Artikel. Importiere eine Excel-Datei.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

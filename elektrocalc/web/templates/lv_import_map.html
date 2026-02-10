@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>LV Import – Mapping</h1>
+<p class="muted">Projekt: <a href="/projects/{{project.id}}">{{project.name}}</a> · Datei: {{filename}} · Typ: {{source_type}}</p>
+
+<div class="card">
+  <h3>Spaltenzuordnung</h3>
+  <form method="post" action="/projects/{{project.id}}/lv/import/commit">
+    <input type="hidden" name="import_id" value="{{import_id}}"/>
+    <input type="hidden" name="source_type" value="{{source_type}}"/>
+    <input type="hidden" name="name" value="{{lv_name}}"/>
+    <input type="hidden" name="csv_delim" value="{{csv_delim}}"/>
+
+    {% if source_type == "xlsx" %}
+    <div class="row">
+      <div>
+        <label>Sheet</label><br/>
+        <select name="sheet" onchange="location.href='/projects/{{project.id}}/lv/import/map?import_id={{import_id}}&source_type=xlsx&sheet=' + encodeURIComponent(this.value) + '&name={{lv_name|urlencode}}'">
+          {% for sh in sheets %}
+            <option value="{{sh}}" {% if sh==sheet %}selected{% endif %}>{{sh}}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div><label>Header-Zeile</label><br/><input name="header_row" type="number" min="1" value="1"/></div>
+      <div><label>Daten ab Zeile</label><br/><input name="start_row" type="number" min="2" value="2"/></div>
+    </div>
+    {% endif %}
+
+    {% for field,label in fields %}
+      <div class="row" style="margin-top:8px">
+        <div style="min-width:260px;max-width:260px"><strong>{{label}}</strong>{% if field in required %} <span class="pill">required</span>{% endif %}</div>
+        <div>
+          <select name="map__{{field}}">
+            <option value="">— nicht zuordnen —</option>
+            {% for h in headers %}
+              <option value="{{h}}" {% if mapping[field]==h %}selected{% endif %}>{{h}}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    {% endfor %}
+
+    <div style="margin-top:12px">
+      <button type="submit">Import ausführen</button>
+      <a class="muted" href="/projects/{{project.id}}/lv">Abbrechen</a>
+    </div>
+  </form>
+
+  {% if source_type == "txt" %}
+    <p class="muted">TXT: Jede Zeile wird als Position übernommen. Optional: <code>posno;qty;unit;text;longtext</code></p>
+  {% endif %}
+</div>
+{% endblock %}

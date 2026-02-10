@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Variantenpakete (DIN 18015) – Regeln</h1>
+
+<div class="card">
+  <p class="muted">Hier definierst du Variantenregeln, die auf Material und Lohn pro Position wirken. Matching kann über Task-Code (Zeitkatalog) oder Pattern auf LV-Text erfolgen.</p>
+</div>
+
+{% for p in profiles %}
+<div class="card">
+  <h3>{{p.name}} ({{p.key}})</h3>
+  <div class="muted">Defaults: GK {{p.default_overhead_pct}} · Gewinn {{p.default_profit_pct}}</div>
+
+  <h4 style="margin-top:12px">Regel anlegen</h4>
+  <form method="post" action="/variants/{{p.id}}/rules/create">
+    <div class="row">
+      <div><label>Match Task-Code</label><br/><input name="match_task_code" placeholder="z.B. STD-STECK"/></div>
+      <div><label>oder Pattern</label><br/><input name="match_pattern" placeholder="z.B. steckdose"/></div>
+      <div><label>Regex?</label><br/><input type="checkbox" name="is_regex"/></div>
+      <div><label>Prio</label><br/><input name="priority" value="100" style="width:100px"/></div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div><label>Lohn-Mult</label><br/><input name="labor_multiplier" value="1.00" style="width:120px"/></div>
+      <div><label>Mat-Mult</label><br/><input name="material_multiplier" value="1.00" style="width:120px"/></div>
+      <div><label>+ Min</label><br/><input name="add_labor_minutes" value="0" style="width:100px"/></div>
+      <div style="flex:1"><label>Notiz</label><br/><input name="note" placeholder="optional" style="width:100%"/></div>
+      <div><label>Aktiv</label><br/><input type="checkbox" name="enabled" checked/></div>
+    </div>
+    <div style="margin-top:10px"><button type="submit">Regel anlegen</button></div>
+  </form>
+
+  <h4 style="margin-top:12px">Regeln</h4>
+  <table>
+    <thead><tr><th>ID</th><th>Prio</th><th>Aktiv</th><th>Task</th><th>Pattern</th><th>LM</th><th>MM</th><th>+Min</th><th>Notiz</th><th></th></tr></thead>
+    <tbody>
+      {% for r in p.rules %}
+      <tr>
+        <td class="muted">{{r.id}}</td>
+        <td class="muted">{{r.priority}}</td>
+        <td class="muted">{{"ja" if r.enabled else "nein"}}</td>
+        <td class="muted">{{r.match_task_code or ""}}</td>
+        <td class="muted">{{("regex:" if r.is_regex else "substr:") ~ (r.match_pattern or "")}}</td>
+        <td class="muted">{{r.labor_multiplier}}</td>
+        <td class="muted">{{r.material_multiplier}}</td>
+        <td class="muted">{{r.add_labor_minutes}}</td>
+        <td class="muted">{{r.note or ""}}</td>
+        <td>
+          <form method="post" action="/variants/rules/{{r.id}}/delete" style="display:inline">
+            <button type="submit">Löschen</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if p.rules|length==0 %}<tr><td colspan="10" class="muted">Keine Regeln.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+{% endfor %}
+
+{% if error %}
+<div class="card" style="border:1px solid #b33">
+  <strong>Fehler:</strong> {{error}}
+</div>
+{% endif %}
+
+{% endblock %}

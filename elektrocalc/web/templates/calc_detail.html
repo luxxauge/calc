@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Kalkulation #{{est.id}} – {{doc.name}}</h1>
+<p class="muted">Projekt: <a href="/projects/{{project.id}}">{{project.name}}</a> · Variante: <strong>{{est.variant}}</strong></p>
+
+<div class="card">
+  <div class="row">
+    <div><a href="/lv/{{doc.id}}/calc">← alle Läufe</a></div>
+    <div class="muted">Stundensatz: {{(est.labor_rate_cent/100)|round(2)}} €/h · GK: {{est.overhead_pct}} · Gewinn: {{est.profit_pct}}</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Summary</h3>
+  <div class="row">
+    <div><strong>Material (netto):</strong> {{(summary.material_cent/100)|round(2)}} €</div>
+    <div><strong>Lohn (netto):</strong> {{(summary.labor_cent/100)|round(2)}} € ({{summary.labor_minutes}} min)</div>
+    <div><strong>Gesamt (inkl. GK+Gewinn, netto):</strong> {{(summary.total_cent/100)|round(2)}} €</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Positionen</h3>
+  <table>
+    <thead><tr><th>Pos</th><th>Text</th><th>Menge</th><th>Material €</th><th>Min</th><th>Quelle</th><th>Task</th><th>Regel</th><th>Lohn €</th><th>Total €</th></tr></thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td class="muted">{{row.pos_no}}</td>
+        <td>{{row.short_text}}</td>
+        <td class="muted">{{row.qty}} {{row.unit}}</td>
+        <td class="muted">{{(row.material_cent/100)|round(2)}}</td>
+        <td class="muted">{{row.labor_minutes}}</td>
+        <td class="muted">{{row.labor_source}}</td>
+        <td class="muted">{{row.labor_task_code or ""}}</td>
+        <td class="muted">{{row.labor_rule_info or ""}}</td>
+        <td class="muted">{{(row.labor_cent/100)|round(2)}}</td>
+        <td><strong>{{(row.total_cent/100)|round(2)}}</strong></td>
+      </tr>
+      {% endfor %}
+      {% if rows|length==0 %}<tr><td colspan="8" class="muted">Keine Zeilen.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+<div class="card">
+  <h3>Zusatzpositionen (parametrisch)</h3>
+  <table>
+    <thead><tr><th>Beschreibung</th><th>Menge</th><th>Material €</th><th>Item</th><th>Min</th><th>Lohn €</th><th>Total €</th><th>Notiz</th></tr></thead>
+    <tbody>
+      {% for x in extras %}
+      <tr>
+        <td>{{x.description}}</td>
+        <td class="muted">{{x.qty}} {{x.unit}}</td>
+        <td class="muted">{{(x.material_cent/100)|round(2)}}</td>
+        <td class="muted">{{x.item_id or ''}}</td>
+        <td class="muted">{{x.labor_minutes}}</td>
+        <td class="muted">{{(x.labor_cent/100)|round(2)}}</td>
+        <td><strong>{{(x.total_cent/100)|round(2)}}</strong></td>
+        <td class="muted">{{x.note or ""}}</td>
+      </tr>
+      {% endfor %}
+      {% if extras|length==0 %}<tr><td colspan="8" class="muted">Keine Zusatzpositionen.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>

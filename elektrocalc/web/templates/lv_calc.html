@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Kalkulation – {{doc.name}}</h1>
+<p class="muted">Projekt: <a href="/projects/{{project.id}}">{{project.name}}</a></p>
+
+<div class="card">
+  <div class="row">
+    <div><a href="/lv/{{doc.id}}">← zurück</a></div>
+    <div><a href="/lv/{{doc.id}}/match">Zuordnung</a></div>
+    <div><a href="/lv/{{doc.id}}/compare">Variantenvergleich</a></div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Neuen Kalkulationslauf starten</h3>
+  <form method="post" action="/lv/{{doc.id}}/calc/run">
+    <div class="row">
+      <div>
+        <label>Variante</label><br/>
+        <select name="variant">
+          <option value="standard">Standard</option>
+          <option value="komfort">Komfort</option>
+          <option value="premium">Premium</option>
+        </select>
+      </div>
+      <div>
+        <label>Stundensatz (€/h, netto)</label><br/>
+        <input name="labor_rate_eur" value="65" style="width:120px"/>
+      </div>
+      <div>
+        <label>Gemeinkosten (z.B. 0.15)</label><br/>
+        <input name="overhead_pct" value="0.15" style="width:120px"/>
+      </div>
+      <div>
+        <label>Gewinn (z.B. 0.10)</label><br/>
+        <input name="profit_pct" value="0.10" style="width:120px"/>
+      </div>
+    </div>
+    <div style="margin-top:10px"><button type="submit">Kalkulieren</button></div>
+    <p class="muted">Hinweis: v1.3 nutzt eine einfache Zeitheuristik (Unit + Keywords). Später ersetzen wir das durch regelbasierte Zeitansätze nach Elektro-Gewerke.</p>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Vorhandene Kalkulationsläufe</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Variante</th><th>Stundensatz</th><th>Datum</th><th>Aktion</th></tr></thead>
+    <tbody>
+      {% for e in estimates %}
+      <tr>
+        <td>{{e.id}}</td>
+        <td class="muted">{{e.variant}}</td>
+        <td class="muted">{{(e.labor_rate_cent/100)|round(2)}}</td>
+        <td class="muted">{{e.created_at}}</td>
+        <td><a href="/calc/{{e.id}}">Öffnen</a></td>
+      </tr>
+      {% endfor %}
+      {% if estimates|length==0 %}<tr><td colspan="5" class="muted">Noch keine Läufe.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

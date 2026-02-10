@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Rate Card / Preisblatt</h1>
+
+<div class="card">
+  <p class="muted">Hier pflegst du Material-Unitpreise (VK netto) und optional das Item-Mapping für parametrische Zusatzpositionen. Keys werden vom Generator genutzt (z.B. socket_kom, data_pre).</p>
+</div>
+
+<div class="card">
+  <h3>Karte: {{card.name}}</h3>
+  <table>
+    <thead><tr><th>Key</th><th>Beschreibung</th><th>Einheit</th><th>Material €/Einheit</th><th>Labor Task</th><th>Item-ID (optional)</th><th></th></tr></thead>
+    <tbody>
+      {% for l in lines %}
+      <tr>
+        <form method="post" action="/ratecard/lines/{{l.id}}/upsert">
+          <td><input name="key" value="{{l.key}}" style="width:140px"/></td>
+          <td><input name="description" value="{{l.description}}" style="width:280px"/></td>
+          <td><input name="unit" value="{{l.unit}}" style="width:70px"/></td>
+          <td><input name="material_eur" value="{{(l.material_unit_cent/100)|round(2)}}" style="width:110px"/></td>
+          <td><input name="labor_task_code" value="{{l.labor_task_code or ''}}" style="width:120px"/></td>
+          <td><input name="item_id" value="{{l.item_id or ''}}" style="width:90px"/></td>
+          <td>
+            <button type="submit">Speichern</button>
+            </form>
+            <form method="post" action="/ratecard/lines/{{l.id}}/delete" style="display:inline">
+              <button type="submit">Löschen</button>
+            </form>
+          </td>
+              </tr>
+      {% endfor %}
+      {% if lines|length==0 %}<tr><td colspan="7" class="muted">Keine Einträge.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h3>Neuen Key anlegen</h3>
+  <form method="post" action="/ratecard/lines/new">
+    <div class="row">
+      <div><label>Key</label><br/><input name="key" placeholder="socket_kom" required/></div>
+      <div style="flex:1"><label>Beschreibung</label><br/><input name="description" placeholder="..." style="width:100%"/></div>
+      <div><label>Einheit</label><br/><input name="unit" value="pcs" style="width:80px"/></div>
+      <div><label>Material €/Einheit</label><br/><input name="material_eur" value="0" style="width:120px"/></div>
+      <div><label>Labor Task</label><br/><input name="labor_task_code" value="" style="width:120px"/></div>
+      <div><label>Item-ID</label><br/><input name="item_id" value="" style="width:80px"/></div>
+      <div><br/><button type="submit">Anlegen</button></div>
+    </div>
+  </form>
+</div>
+
+{% if error %}
+<div class="card" style="border:1px solid #b33">
+  <strong>Fehler:</strong> {{error}}
+</div>
+{% endif %}
+
+{% endblock %}

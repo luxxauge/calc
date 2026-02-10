@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Projekt: {{project.name}}</h1>
+<p class="muted">Profil: <span class="pill">{{project.profile}}</span> · Kunde: {{project.customer_name or "-"}}</p>
+
+<div class="card">
+  <div class="row">
+    <div><a href="/projects/{{project.id}}">Inputs</a></div>
+    <div><a href="/projects/{{project.id}}/variants">Varianten</a></div>
+    <div><a href="/projects/{{project.id}}/plans">Grundrisse</a></div>
+    <div><a href="/projects/{{project.id}}/mapping">Plan→Kalk Mapping</a></div>
+    <div><a href="/projects/{{project.id}}/parampreview">Param-Preview</a></div>
+      <div><a href="/projects/{{project.id}}/lv">LV / Ausschreibung</a></div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Objektkennwerte</h3>
+  <form method="post" action="/projects/{{project.id}}/inputs">
+    <div class="row">
+      <div><label>Fläche m²</label><br/><input name="area_m2" value="{{inputs.area_m2}}"/></div>
+      <div><label>Etagen</label><br/><input name="floors" type="number" min="1" value="{{inputs.floors}}"/></div>
+      <div><label>Raumhöhe (m)</label><br/><input name="room_height_m" value="{{inputs.room_height_m}}"/></div>
+      <div>
+        <label>Gebäudetyp</label><br/>
+        <select name="building_type">
+          <option value="efh" {% if inputs.building_type=="efh" %}selected{% endif %}>EFH</option>
+          <option value="mfh" {% if inputs.building_type=="mfh" %}selected{% endif %}>MFH</option>
+          <option value="gewerbe" {% if inputs.building_type=="gewerbe" %}selected{% endif %}>Gewerbe</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Installationsart</label><br/>
+        <select name="install_type">
+          {% for v in install_types %}<option value="{{v}}" {% if inputs.install_type==v %}selected{% endif %}>{{v}}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Sanierungstiefe</label><br/>
+        <select name="renovation_depth">
+          {% for v in reno_depths %}<option value="{{v}}" {% if inputs.renovation_depth==v %}selected{% endif %}>{{v}}</option>{% endfor %}
+        </select>
+      </div>
+      <div><label>Verteiler-/Weg-Faktor</label><br/><input name="distribution_factor" value="{{inputs.distribution_factor}}"/></div>
+    </div>
+    <div class="row">
+      <div><label>Grundriss-Faktor</label><br/><input name="layout_factor" value="{{inputs.layout_factor}}"/></div>
+      <div><label>Zimmer gesamt</label><br/><input name="rooms_total" type="number" value="{{inputs.rooms_total or ''}}"/></div>
+      <div><label>Wohneinheiten (MFH)</label><br/><input name="apartments" type="number" value="{{inputs.apartments or ''}}"/></div>
+      <div><label>Bäder</label><br/><input name="bathrooms" type="number" value="{{inputs.bathrooms or ''}}"/></div>
+    </div>
+    <div style="margin-top:10px">
+      <button type="submit">Speichern</button>
+      <a class="muted" href="/projects/{{project.id}}/variants">→ zu Varianten</a>
+    </div>
+      <div class="card">
+      <h3>Kalkulationsparameter</h3>
+      <div class="row">
+        <div><label>Lohnsatz (€/h)</label><br/><input name="labor_rate_eur_h" value="{{inputs.labor_rate_eur_h}}"/></div>
+        <div><label>Overhead (z.B. 0.15)</label><br/><input name="overhead_pct" value="{{inputs.overhead_pct}}"/></div>
+        <div><label>Profit (z.B. 0.10)</label><br/><input name="profit_pct" value="{{inputs.profit_pct}}"/></div>
+      </div>
+      <p class="muted">Hinweis: Werte werden im Preview/Compare/Exports verwendet. Prozentwerte als Dezimalzahl (0.15 = 15%).</p>
+    </div>
+
+</form>
+</div>
+{% endblock %}

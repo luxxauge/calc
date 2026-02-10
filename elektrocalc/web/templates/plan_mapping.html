@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Plan → Kalkulation Mapping</h1>
+<p class="muted">Mapping pro Projekt: Route-/Punkt-Typ → Rate-Key + Einheit + Faktor. Optional variant_key setzen für standard/komfort/premium. Faktor kann als Verteiler-/Weg-Faktor genutzt werden.</p>
+
+<div class="card">
+  <h3>Neuer / Update Eintrag</h3>
+  <form method="post" action="/projects/{{project.id}}/mapping/upsert">
+    <div class="row">
+      <div><label>Kind</label><br/>
+        <select name="kind"><option value="route">route</option><option value="point">point</option></select>
+      </div>
+      <div><label>Key (route_type/point_type)</label><br/><input name="key" placeholder="CABLE_ROUTE / SOCKET" required/></div>
+      <div><label>Variant (optional)</label><br/><input name="variant_key" placeholder="standard/komfort/premium"/></div>
+    </div>
+    <div class="row">
+      <div><label>Rate-Key</label><br/><input name="rate_key" placeholder="ROUTE_CABLE" required/></div>
+      <div><label>Unit</label><br/><input name="unit" value="m"/></div>
+      <div><label>Faktor</label><br/><input name="qty_factor" value="1"/></div>
+    </div>
+    <div><label>Beschreibung</label><br/><input name="description" style="width:100%"/></div>
+    <button type="submit">Speichern</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Mappings</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Kind</th><th>Key</th><th>Variant</th><th>Rate-Key</th><th>Unit</th><th>Faktor</th><th>Beschreibung</th><th></th></tr></thead>
+    <tbody>
+      {% for m in mappings %}
+      <tr>
+        <td>{{m.id}}</td>
+        <td>{{m.kind}}</td>
+        <td>{{m.key}}</td>
+        <td class="muted">{{m.variant_key or "—"}}</td>
+        <td>{{m.rate_key}}</td>
+        <td>{{m.unit}}</td>
+        <td>{{m.qty_factor}}</td>
+        <td class="muted">{{m.description or ""}}</td>
+        <td>
+          <form method="post" action="/projects/{{project.id}}/mapping/{{m.id}}/delete" style="display:inline">
+            <button class="danger" type="submit">Löschen</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if mappings|length==0 %}<tr><td colspan="9" class="muted">Noch keine Mappings.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

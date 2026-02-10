@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Projekte</h1>
+
+<div class="card">
+  <h3>Neues Projekt</h3>
+  <form method="post" action="/projects/create">
+    <div class="row">
+      <div>
+        <label>Projektname</label><br/>
+        <input name="name" required placeholder="z. B. MFH Musterstraße 12"/>
+      </div>
+      <div>
+        <label>Kunde</label><br/>
+        <input name="customer_name" placeholder="optional"/>
+      </div>
+      <div>
+        <label>Profil</label><br/>
+        <select name="profile">
+          {% for p in profiles %}<option value="{{p}}">{{p}}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:10px"><button type="submit">Anlegen</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Liste</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Name</th><th>Profil</th><th>Kunde</th><th>Aktion</th></tr></thead>
+    <tbody>
+      {% for p in projects %}
+      <tr>
+        <td>{{p.id}}</td>
+        <td><a href="/projects/{{p.id}}">{{p.name}}</a></td>
+        <td><span class="pill">{{p.profile}}</span></td>
+        <td class="muted">{{p.customer_name or ""}}</td>
+        <td><a href="/projects/{{p.id}}">Öffnen</a></td>
+      </tr>
+      {% endfor %}
+      {% if projects|length==0 %}<tr><td colspan="5" class="muted">Noch keine Projekte.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

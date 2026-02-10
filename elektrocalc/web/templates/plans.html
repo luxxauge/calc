@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Grundrisse – {{project.name}}</h1>
+
+<div class="card">
+  <div class="row">
+    <div><a href="/projects/{{project.id}}">← zurück</a></div>
+    <div><a href="/projects/{{project.id}}/variants">Varianten</a></div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Plan hochladen (PDF/JPG/PNG)</h3>
+  <form method="post" action="/projects/{{project.id}}/plans/upload" enctype="multipart/form-data">
+    <div class="row">
+      <div><label>Name</label><br/><input name="plan_name" required placeholder="z. B. EG"/></div>
+      <div><label>PDF Seite (optional)</label><br/><input name="pdf_page_index" type="number" min="0" value="0"/></div>
+      <div><label>Datei</label><br/><input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required/></div>
+    </div>
+    <div style="margin-top:10px"><button type="submit">Upload</button></div>
+  </form>
+  <p class="muted">Nach Upload: Editor öffnen → Maßstab setzen → Räume/Punkte eintragen.</p>
+</div>
+
+<div class="card">
+  <h3>Pläne</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Name</th><th>Scale</th><th>Aktion</th></tr></thead>
+    <tbody>
+      {% for p in plans %}
+      <tr>
+        <td>{{p.id}}</td>
+        <td>{{p.name}}</td>
+        <td class="muted">{{p.scale_m_per_px or "— (nicht gesetzt)"}}</td>
+        <td><a href="/plans/{{p.id}}/editor">Editor</a></td>
+      </tr>
+      {% endfor %}
+      {% if plans|length==0 %}<tr><td colspan="4" class="muted">Noch keine Pläne.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

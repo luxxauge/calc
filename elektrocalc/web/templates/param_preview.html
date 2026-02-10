@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Generator Preview (Param-Regeln)</h1>
+
+<div class="card">
+  <p class="muted">
+    Simuliert die param. Zusatzpositionen ohne Kalkulationslauf. Nutzt aktuelle Param-Regeln + Rate Card + optional Item-Mapping.
+  </p>
+</div>
+
+<div class="card">
+  <h3>Inputs</h3>
+  <form method="get" action="/parampreview">
+    <div class="row">
+      <div><label>Variante</label><br/>
+        <select name="variant">
+          <option value="standard" {% if variant=="standard" %}selected{% endif %}>standard</option>
+          <option value="komfort" {% if variant=="komfort" %}selected{% endif %}>komfort</option>
+          <option value="premium" {% if variant=="premium" %}selected{% endif %}>premium</option>
+        </select>
+      </div>
+      <div><label>Gebäudetyp</label><br/>
+        <select name="building_type">
+          <option value="efh" {% if building_type=="efh" %}selected{% endif %}>efh</option>
+          <option value="mfh" {% if building_type=="mfh" %}selected{% endif %}>mfh</option>
+          <option value="gewerbe" {% if building_type=="gewerbe" %}selected{% endif %}>gewerbe</option>
+        </select>
+      </div>
+      <div><label>Fläche m²</label><br/><input name="area_m2" value="{{area_m2}}"/></div>
+      <div><label>Zimmer</label><br/><input name="rooms" type="number" value="{{rooms}}"/></div>
+      <div><label>Etagen</label><br/><input name="floors" type="number" value="{{floors}}"/></div>
+      <div><label>Wohneinheiten</label><br/><input name="apartments" type="number" value="{{apartments}}"/></div>
+      <div style="align-self:end"><button type="submit">Preview</button></div>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Ergebnis</h3>
+  <table>
+    <thead><tr><th>Beschreibung</th><th>Rate-Key</th><th>Qty</th><th>Einheit</th><th>Unit €</th><th>Item</th><th>Material €</th><th>Task</th><th>Min</th><th>Lohn €</th><th>Total €</th><th>Notiz</th></tr></thead>
+    <tbody>
+      {% for x in extras %}
+      <tr>
+        <td>{{x.description}}</td>
+        <td class="muted">{{x.rate_key}}</td>
+        <td class="muted">{{x.qty}}</td>
+        <td class="muted">{{x.unit}}</td>
+        <td class="muted">{{(x.unit_cent/100)|round(2)}}</td>
+        <td class="muted">{{x.item_id or ""}}</td>
+        <td class="muted">{{(x.material_cent/100)|round(2)}}</td>
+        <td class="muted">{{x.labor_task_code}}</td>
+        <td class="muted">{{x.labor_minutes}}</td>
+        <td class="muted">{{(x.labor_cent/100)|round(2)}}</td>
+        <td><strong>{{(x.total_cent/100)|round(2)}}</strong></td>
+        <td class="muted">{{x.note or ""}}</td>
+      </tr>
+      {% endfor %}
+      {% if extras|length==0 %}<tr><td colspan="12" class="muted">Keine generierten Zusatzpositionen.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h3>Regel-Check (Debug)</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Prio</th><th>Scope</th><th>Rate-Key</th><th>Expr</th><th>Qty</th><th>Status</th><th>Hinweis</th></tr></thead>
+    <tbody>
+      {% for r in rule_checks %}
+      <tr>
+        <td class="muted">{{r.id}}</td>
+        <td class="muted">{{r.priority}}</td>
+        <td class="muted">{{r.variant_key}} / {{r.building_type}}</td>
+        <td class="muted">{{r.rate_key}}</td>
+        <td class="muted">{{r.qty_expr}}</td>
+        <td class="muted">{{r.qty}}</td>
+        <td class="muted">{{r.status}}</td>
+        <td class="muted">{{r.note}}</td>
+      </tr>
+      {% endfor %}
+      {% if rule_checks|length==0 %}<tr><td colspan="8" class="muted">Keine Regeln.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+
+{% if error %}
+<div class="card" style="border:1px solid #b33">
+  <strong>Fehler:</strong> {{error}}
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Variantenvergleich – {{doc.name}}</h1>
+<p class="muted">Projekt: <a href="/projects/{{project.id}}">{{project.name}}</a></p>
+
+<div class="card">
+  <div class="row">
+    <div><a href="/lv/{{doc.id}}">← zurück</a></div>
+    <div><a href="/lv/{{doc.id}}/calc">Kalkulationen</a></div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Summary (netto)</h3>
+  <table>
+    <thead><tr><th>Variante</th><th>Material €</th><th>Lohn €</th><th>Min</th><th>Gesamt €</th><th>Estimate</th></tr></thead>
+    <tbody>
+      {% for s in summaries %}
+      <tr>
+        <td><strong>{{s.variant}}</strong></td>
+        <td class="muted">{{(s.material_cent/100)|round(2)}}</td>
+        <td class="muted">{{(s.labor_cent/100)|round(2)}}</td>
+        <td class="muted">{{s.labor_minutes}}</td>
+        <td><strong>{{(s.total_cent/100)|round(2)}}</strong></td>
+        <td class="muted">{% if s.estimate_id %}<a href="/calc/{{s.estimate_id}}">#{{s.estimate_id}}</a>{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted">Hinweis: Vergleich nutzt jeweils den neuesten Kalkulationslauf pro Variante.</p>
+</div>
+
+<div class="card">
+  <h3>Zusatzpositionen – Breakdown</h3>
+  <p class="muted">Diese Zeilen kommen aus Param-Regeln (nicht aus dem LV). Optional mit Item-Mapping aus dem Artikelstamm.</p>
+  <div class="row">
+    <div style="flex:1">
+      <h4>Standard</h4>
+      <ul>
+        {% for x in extras_by_variant['standard'] %}
+          <li class="muted">{{x.description}} – {{(x.total_cent/100)|round(2)}} €</li>
+        {% endfor %}
+        {% if extras_by_variant['standard']|length==0 %}<li class="muted">—</li>{% endif %}
+      </ul>
+    </div>
+    <div style="flex:1">
+      <h4>Komfort</h4>
+      <ul>
+        {% for x in extras_by_variant['komfort'] %}
+          <li class="muted">{{x.description}} – {{(x.total_cent/100)|round(2)}} €</li>
+        {% endfor %}
+        {% if extras_by_variant['komfort']|length==0 %}<li class="muted">—</li>{% endif %}
+      </ul>
+    </div>
+    <div style="flex:1">
+      <h4>Premium</h4>
+      <ul>
+        {% for x in extras_by_variant['premium'] %}
+          <li class="muted">{{x.description}} – {{(x.total_cent/100)|round(2)}} €</li>
+        {% endfor %}
+        {% if extras_by_variant['premium']|length==0 %}<li class="muted">—</li>{% endif %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Delta (Komfort − Standard, Premium − Standard)</h3>
+  <table>
+    <thead><tr><th>Pos</th><th>Text</th><th>Std €</th><th>Komf €</th><th>Δ Komf</th><th>Prem €</th><th>Δ Prem</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td class="muted">{{r.pos_no}}</td>
+        <td>{{r.short_text}}</td>
+        <td class="muted">{{(r.std_total/100)|round(2)}}</td>
+        <td class="muted">{{(r.kom_total/100)|round(2)}}</td>
+        <td><strong>{{((r.kom_total - r.std_total)/100)|round(2)}}</strong></td>
+        <td class="muted">{{(r.pre_total/100)|round(2)}}</td>
+        <td><strong>{{((r.pre_total - r.std_total)/100)|round(2)}}</strong></td>
+      </tr>
+      {% endfor %}
+      {% if rows|length==0 %}<tr><td colspan="7" class="muted">Keine Daten (erst Läufe anlegen).</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

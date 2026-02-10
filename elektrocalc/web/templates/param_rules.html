@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Parametrische Regeln (Generator)</h1>
+
+<div class="card">
+  <p class="muted">
+    Regeln erzeugen Zusatzpositionen aus Objektparametern.<br/>
+    Variablen im Ausdruck: <code>area_m2</code>, <code>rooms</code>, <code>floors</code>, <code>apartments</code>.<br/>
+    Funktionen: <code>min()</code>, <code>max()</code>, <code>round()</code>, <code>int()</code>, <code>ceil()</code>, <code>floor()</code>.
+  </p>
+</div>
+
+<div class="card">
+  <h3>Regel anlegen</h3>
+  <form method="post" action="/paramrules/create">
+    <div class="row">
+      <div>
+        <label>Variante</label><br/>
+        <select name="variant_key">
+          <option value="any">any</option>
+          <option value="standard">standard</option>
+          <option value="komfort" selected>komfort</option>
+          <option value="premium">premium</option>
+        </select>
+      </div>
+      <div>
+        <label>Gebäudetyp</label><br/>
+        <select name="building_type">
+          <option value="any" selected>any</option>
+          <option value="efh">efh</option>
+          <option value="mfh">mfh</option>
+          <option value="gewerbe">gewerbe</option>
+        </select>
+      </div>
+      <div><label>Prio</label><br/><input name="priority" value="100" style="width:90px"/></div>
+      <div><label>Aktiv</label><br/><input type="checkbox" name="enabled" checked/></div>
+    </div>
+
+    <div class="row" style="margin-top:8px">
+      <div><label>Rate-Key</label><br/><input name="rate_key" placeholder="socket_kom" required/></div>
+      <div style="flex:1"><label>Beschreibung</label><br/><input name="description_tpl" placeholder="z.B. Zusatz Steckdosen ({variant})" style="width:100%"/></div>
+      <div><label>Einheit</label><br/><input name="unit" value="pcs" style="width:80px"/></div>
+    </div>
+
+    <div class="row" style="margin-top:8px">
+      <div style="flex:1"><label>Mengen-Ausdruck</label><br/><input name="qty_expr" placeholder="z.B. max(0,(6-4)*rooms)" style="width:100%" required/></div>
+    </div>
+
+    <div class="row" style="margin-top:8px">
+      <div style="flex:1"><label>Notiz</label><br/><input name="note" placeholder="optional" style="width:100%"/></div>
+      <div><button type="submit">Anlegen</button></div>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Regeln</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Prio</th><th>Aktiv</th><th>Variante</th><th>Gebäude</th><th>Rate-Key</th><th>Unit</th><th>Expr</th><th>Beschreibung</th><th>Notiz</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rules %}
+      <tr>
+        <td class="muted">{{r.id}}</td>
+        <td class="muted">{{r.priority}}</td>
+        <td class="muted">{{"ja" if r.enabled else "nein"}}</td>
+        <td class="muted">{{r.variant_key}}</td>
+        <td class="muted">{{r.building_type}}</td>
+        <td>{{r.rate_key}}</td>
+        <td class="muted">{{r.unit}}</td>
+        <td class="muted">{{r.qty_expr}}</td>
+        <td class="muted">{{r.description_tpl}}</td>
+        <td class="muted">{{r.note or ""}}</td>
+        <td>
+          <form method="post" action="/paramrules/{{r.id}}/delete" style="display:inline">
+            <button type="submit">Löschen</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if rules|length==0 %}<tr><td colspan="11" class="muted">Keine Regeln.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+
+{% if error %}
+<div class="card" style="border:1px solid #b33">
+  <strong>Fehler:</strong> {{error}}
+</div>
+{% endif %}
+{% endblock %}

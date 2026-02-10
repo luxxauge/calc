@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Zeitkatalog (Tätigkeiten & Regeln)</h1>
+
+<div class="card">
+  <h3>Tätigkeit anlegen</h3>
+  <form method="post" action="/labor/tasks/create">
+    <div class="row">
+      <div><label>Code</label><br/><input name="code" placeholder="z.B. STD-STECK" required/></div>
+      <div><label>Name</label><br/><input name="name" placeholder="Steckdose setzen (UP/AP)" required/></div>
+      <div>
+        <label>Einheit</label><br/>
+        <select name="unit">
+          <option value="pcs">pcs</option>
+          <option value="m">m</option>
+          <option value="m²">m²</option>
+          <option value="h">h</option>
+        </select>
+      </div>
+      <div><label>Min / Einheit</label><br/><input name="minutes_per_unit" value="10" style="width:120px"/></div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div style="flex:1"><label>Notiz</label><br/><input name="notes" placeholder="optional" style="width:100%"/></div>
+      <div><button type="submit">Anlegen</button></div>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Regel anlegen (LV-Text → Tätigkeit)</h3>
+  <form method="post" action="/labor/rules/create">
+    <div class="row">
+      <div><label>Pattern</label><br/><input name="pattern" placeholder="z.B. steckdose" required/></div>
+      <div><label>Regex?</label><br/><input type="checkbox" name="is_regex"/></div>
+      <div><label>Priorität (kleiner = früher)</label><br/><input name="priority" value="100" style="width:140px"/></div>
+      <div>
+        <label>Tätigkeit</label><br/>
+        <select name="task_id" required>
+          {% for t in tasks %}
+            <option value="{{t.id}}">{{t.code}} – {{t.name}}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div><label>Aktiv</label><br/><input type="checkbox" name="enabled" checked/></div>
+    </div>
+    <div style="margin-top:10px"><button type="submit">Regel anlegen</button></div>
+    <p class="muted">Regex nutzt Python-Regex. Substring ist robust und reicht oft.</p>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Tätigkeiten</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Code</th><th>Name</th><th>Einheit</th><th>Min</th><th>Aktion</th></tr></thead>
+    <tbody>
+      {% for t in tasks %}
+      <tr>
+        <td class="muted">{{t.id}}</td>
+        <td>{{t.code}}</td>
+        <td>{{t.name}}</td>
+        <td class="muted">{{t.unit}}</td>
+        <td class="muted">{{t.minutes_per_unit}}</td>
+        <td>
+          <form method="post" action="/labor/tasks/{{t.id}}/delete" style="display:inline">
+            <button type="submit">Löschen</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if tasks|length==0 %}<tr><td colspan="6" class="muted">Keine Tätigkeiten.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h3>Regeln</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Prio</th><th>Aktiv</th><th>Typ</th><th>Pattern</th><th>Tätigkeit</th><th>Aktion</th></tr></thead>
+    <tbody>
+      {% for r in rules %}
+      <tr>
+        <td class="muted">{{r.id}}</td>
+        <td class="muted">{{r.priority}}</td>
+        <td class="muted">{{"ja" if r.enabled else "nein"}}</td>
+        <td class="muted">{{"regex" if r.is_regex else "substr"}}</td>
+        <td>{{r.pattern}}</td>
+        <td class="muted">{{r.task.code}} – {{r.task.name}}</td>
+        <td>
+          <form method="post" action="/labor/rules/{{r.id}}/delete" style="display:inline">
+            <button type="submit">Löschen</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      {% if rules|length==0 %}<tr><td colspan="7" class="muted">Keine Regeln.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+
+{% if error %}
+<div class="card" style="border:1px solid #b33">
+  <strong>Fehler:</strong> {{error}}
+</div>
+{% endif %}
+
+{% endblock %}

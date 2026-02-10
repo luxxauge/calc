@@ -1,0 +1,175 @@
+\
+{% extends "base.html" %}
+{% block content %}
+<h1>Plan-Editor – {{plan.name}}</h1>
+<p class="muted">Projekt: <a href="/projects/{{project.id}}">{{project.name}}</a> · Plan ID: {{plan.id}} · Maßstab: <span id="scaleText">{{plan.scale_m_per_px or "—"}}</span> m/px</p>
+
+<div class="card">
+  <div class="toolbar">
+    <div class="group">
+      <strong>Tool:</strong>
+      <select id="tool">
+        <option value="pan">Pan/Zoom</option>
+        <option value="scale">Maßstab (2 Punkte)</option>
+        <option value="room">Raum polygon</option>
+        <option value="point">Punkt setzen</option>
+        <option value="route">Leitungsweg (Polyline)</option>
+      </select>
+    </div>
+    <div class="group">
+      <label>Route-Type</label>
+      <select id="routeType">
+        <option value="CABLE_ROUTE">CABLE_ROUTE</option>
+        <option value="TRUNKING">TRUNKING</option>
+        <option value="CONDUIT">CONDUIT</option>
+      </select>
+      <button id="finishRoute" class="secondary" type="button">Leitungsweg abschließen</button>
+    </div>
+
+    <div class="group">
+      <label>Punkt-Typ</label>
+      <select id="pointType">
+        <option>SOCKET</option>
+        <option>DATA</option>
+        <option>LIGHT_OUTLET</option>
+        <option>SWITCH_POINT</option>
+        <option>UV</option>
+      </select>
+    </div>
+    <div class="group">
+      <label>Room-Type</label>
+      <input id="roomType" value="WOHNEN" style="width:120px"/>
+      <label>Name</label>
+      <input id="roomName" placeholder="optional" style="width:140px"/>
+      <button id="finishRoom" class="secondary" type="button">Raum abschließen</button>
+    </div>
+    <div class="group">
+      <small class="hint" id="hint">Tipp: Maßstab zuerst setzen, dann Räume/Punkte.</small>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="canvas-wrap">
+    <canvas id="c" width="1100" height="700"></canvas>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Summary</h3>
+  <div class="row">
+    <div><strong>Maßstab:</strong> {{summary.scale_m_per_px or "—"}} m/px</div>
+    <div><strong>Räume:</strong> {{summary.rooms_count}}</div>
+    <div><strong>Punkte:</strong> {{summary.points_count}}</div>
+    <div><strong>Routen:</strong> {{summary.routes_count}}</div>
+    <div><strong>Route total:</strong> {{summary.routes_total_m or "—"}} m</div>
+  </div>
+  <p class="muted">Punkte nach Typ: {% for k,v in summary.points_by_type.items() %}{{k}}={{v}} {% endfor %}</p>
+</div>
+
+<div class="card">
+  <h3>Raumflächen</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Name</th><th>Typ</th><th>m²</th><th>px²</th></tr></thead>
+    <tbody>
+      {% for r in summary.room_areas %}
+      <tr>
+        <td>{{r.id}}</td>
+        <td>{{r.name}}</td>
+        <td class="muted">{{r.room_type}}</td>
+        <td>{{r.area_m2 if r.area_m2 is not none else "—"}}</td>
+        <td class="muted">{{r.area_px2}}</td>
+      </tr>
+      {% endfor %}
+      {% if summary.room_areas|length==0 %}<tr><td colspan="5" class="muted">Noch keine Räume.</td></tr>{% endif %}
+    </tbody>
+  </table>
+  <p class="muted">Für m² muss der Maßstab gesetzt sein.</p>
+</div>
+
+<div class="card">
+  <h3>Plan-Quantities</h3>
+  <div class="row">
+    <div><strong>Route total (m):</strong> {{summary.quantities.routes_total_m if summary.quantities.routes_total_m is not none else "—"}}</div>
+    <div><strong>Route total (px):</strong> {{summary.quantities.routes_total_px}}</div>
+  </div>
+  <h4>Routen nach Typ (m)</h4>
+  <p class="muted">
+    {% for k,v in summary.quantities.routes_by_type_m.items() %}{{k}}={{v}} m {% endfor %}
+    {% if summary.quantities.routes_by_type_m|length==0 %}—{% endif %}
+  </p>
+  <h4>Punkte nach Typ</h4>
+  <p class="muted">
+    {% for k,v in summary.quantities.points_by_type.items() %}{{k}}={{v}} {% endfor %}
+    {% if summary.quantities.points_by_type|length==0 %}—{% endif %}
+  </p>
+  <details>
+    <summary class="muted">Raw JSON</summary>
+    <pre style="white-space:pre-wrap">{{ summary.quantities | tojson(indent=2) }}</pre>
+  </details>
+</div>
+
+
+<div class="card">
+  <div class="row">
+    <div>
+      <h3>Räume</h3>
+      <table>
+        <thead><tr><th>ID</th><th>Type</th><th>Name</th></tr></thead>
+        <tbody>
+          {% for r in rooms %}
+          <tr><td>{{r.id}}</td><td>{{r.room_type}}</td><td class="muted">{{r.name or ""}}</td></tr>
+          {% endfor %}
+          {% if rooms|length==0 %}<tr><td colspan="3" class="muted">Noch keine Räume.</td></tr>{% endif %}
+        </tbody>
+      </table>
+    </div>
+    <div><div>
+  <h3>Routen</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Type</th><th>Länge (px)</th><th>Länge (m)</th><th></th></tr></thead>
+    <tbody>
+      {% for r in summary.routes %}
+      <tr>
+        <td>{{r.id}}</td>
+        <td>{{r.route_type}}</td>
+        <td class="muted">{{r.length_px}}</td>
+        <td class="muted">{{r.length_m if r.length_m is not none else "—"}}</td>
+        <td><button type="button" class="danger" onclick="deleteRoute({{r.id}})">Löschen</button></td>
+      </tr>
+      {% endfor %}
+      {% if summary.routes|length==0 %}<tr><td colspan="5" class="muted">Noch keine Routen.</td></tr>{% endif %}
+    </tbody>
+  </table>
+  <p class="muted">Hinweis: Für Meterwerte muss zuerst der Maßstab gesetzt werden.</p>
+</div>
+
+<h3>Punkte</h3>
+      <table>
+        <thead><tr><th>ID</th><th>Type</th><th>x</th><th>y</th></tr></thead>
+        <tbody>
+          {% for p in points %}
+          <tr><td>{{p.id}}</td><td>{{p.point_type}}</td><td class="muted">{{p.x_px}}</td><td class="muted">{{p.y_px}}</td></tr>
+          {% endfor %}
+          {% if points|length==0 %}<tr><td colspan="4" class="muted">Noch keine Punkte.</td></tr>{% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const PLAN_ID = {{plan.id}};
+  const IMG_URL = "/plans/{{plan.id}}/raster/work";
+  window.EXISTING_ROUTES = {{ routes | tojson }};
+</script>
+<script>
+async function deleteRoute(id){
+  if(!confirm("Route wirklich löschen?")) return;
+  const res = await fetch(`/api/routes/${id}`, {method:"DELETE"});
+  if(!res.ok){ alert("Löschen fehlgeschlagen."); return; }
+  location.reload();
+}
+</script>
+<script src="/static/plan_editor.js"></script>
+{% endblock %}

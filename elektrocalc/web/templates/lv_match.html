@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Zuordnung – {{doc.name}}</h1>
+<p class="muted">Projekt: <a href="/projects/{{project.id}}">{{project.name}}</a></p>
+
+<div class="card">
+  <div class="row">
+    <div><a href="/lv/{{doc.id}}">← zurück</a></div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Positions-Matching (manuell, mit Suche)</h3>
+  <p class="muted">Tippe im Suchfeld, wähle Artikel. Speicherung erfolgt sofort.</p>
+  <table>
+    <thead><tr><th>Pos</th><th>Text</th><th>Menge</th><th>Artikel</th></tr></thead>
+    <tbody>
+      {% for p in positions %}
+      <tr>
+        <td class="muted">{{p.pos_no or ""}}</td>
+        <td>{{p.short_text}}</td>
+        <td class="muted">{{p.qty}} {{p.unit}}</td>
+        <td>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="search" data-pos="{{p.id}}" placeholder="Suche Artikel..." style="min-width:260px"/>
+            <select class="pick" data-pos="{{p.id}}" style="min-width:360px">
+              <option value="">—</option>
+            </select>
+            <button class="save" data-pos="{{p.id}}" type="button">Speichern</button>
+          </div>
+          <div class="muted" id="current-{{p.id}}">
+            {% if p.match and p.match.item %}
+              aktuell: {{p.match.item.article_no}} – {{p.match.item.name}}
+            {% else %}
+              aktuell: —
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script src="/static/lv_match.js"></script>
+{% endblock %}

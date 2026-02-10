@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>LV / Ausschreibung – {{project.name}}</h1>
+
+<div class="card">
+  <div class="row"><div><a href="/projects/{{project.id}}">← zurück</a></div></div>
+</div>
+
+<div class="card">
+  <h3>Neues LV importieren</h3>
+  <form method="post" action="/projects/{{project.id}}/lv/import/start" enctype="multipart/form-data">
+    <div class="row">
+      <div><label>LV-Name</label><br/><input name="name" required placeholder="z.B. LV Elektro EG+OG"/></div>
+      <div><label>Datei (xlsx/csv/txt)</label><br/><input type="file" name="file" accept=".xlsx,.csv,.txt" required/></div>
+      <div><label>CSV Trenner</label><br/><input name="csv_delim" value=";" style="width:90px"/></div>
+    </div>
+    <div style="margin-top:10px"><button type="submit">Weiter (Mapping)</button></div>
+  </form>
+  <p class="muted">Mehrere LVs pro Projekt sind möglich. Mapping wird pro Import durchgeführt.</p>
+</div>
+
+<div class="card">
+  <h3>Vorhandene LVs</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Name</th><th>Typ</th><th>Datum</th><th>Aktion</th></tr></thead>
+    <tbody>
+      {% for d in docs %}
+      <tr>
+        <td>{{d.id}}</td>
+        <td>{{d.name}}</td>
+        <td class="muted">{{d.source_type}}</td>
+        <td class="muted">{{d.created_at}}</td>
+        <td><a href="/lv/{{d.id}}">Öffnen</a></td>
+      </tr>
+      {% endfor %}
+      {% if docs|length==0 %}<tr><td colspan="5" class="muted">Noch keine LVs. Importiere eins.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

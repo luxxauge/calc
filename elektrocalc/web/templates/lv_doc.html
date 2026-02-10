@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>LV: {{doc.name}}</h1>
+<p class="muted">Projekt: <a href="/projects/{{project.id}}">{{project.name}}</a> · Typ: {{doc.source_type}} · Datei: {{doc.filename or "-"}}</p>
+
+<div class="card">
+  <div class="row">
+    <div><a href="/projects/{{project.id}}/lv">← LV-Liste</a></div>
+    <div><a href="/lv/{{doc.id}}/match">Positionen zuordnen</a></div>
+    <div><a href="/lv/{{doc.id}}/calc">Kalkulation</a></div>
+    <div><a href="/lv/{{doc.id}}/compare">Variantenvergleich</a></div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Positionen</h3>
+  <table>
+    <thead><tr><th>Pos</th><th>Kurztext</th><th>Menge</th><th>Einh.</th><th>Zuordnung</th></tr></thead>
+    <tbody>
+      {% for p in positions %}
+      <tr>
+        <td class="muted">{{p.pos_no or ""}}</td>
+        <td>{{p.short_text}}</td>
+        <td class="muted">{{p.qty}}</td>
+        <td class="muted">{{p.unit}}</td>
+        <td class="muted">
+          {% if p.match and p.match.item %}
+            {{p.match.item.article_no}} – {{p.match.item.name}}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      {% if positions|length==0 %}<tr><td colspan="5" class="muted">Keine Positionen.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

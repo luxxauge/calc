@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Varianten – {{project.name}}</h1>
+
+<div class="card">
+  <div class="row">
+    <div><a href="/projects/{{project.id}}">← zurück</a></div>
+    <div><a href="/projects/{{project.id}}/plans">Grundrisse</a></div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Berechnung v1 (minimal)</h3>
+  <p class="muted">Erzeugt einen Calc Run. Mengen werden aus den im Plan gesetzten Punkten gezählt (Punkte → Qty). Die vollständige LV-/Preis-Engine kommt als nächster Schritt.</p>
+  <div class="row">
+    {% for v in variants %}
+      <form method="post" action="/projects/{{project.id}}/variants/{{v}}/recalc"><button type="submit">Neu berechnen: {{v}}</button></form>
+    {% endfor %}
+  </div>
+</div>
+
+{% for v in variants %}
+<div class="card">
+  <h3>{{v}} – Calc Runs</h3>
+  <table>
+    <thead><tr><th>ID</th><th>Datum</th><th>Inputs</th><th>Plan</th><th>Netto</th><th>Details</th></tr></thead>
+    <tbody>
+      {% for r in runs[v] %}
+      <tr>
+        <td>{{r.id}}</td>
+        <td>{{r.created_at}}</td>
+        <td class="muted">{{r.inputs_hash[:12]}}…</td>
+        <td class="muted">{{ (r.plan_hash[:12] + "…") if r.plan_hash else "-" }}</td>
+        <td>{{r.total_net_cent/100}}</td>
+        <td><a href="/calc/{{r.id}}">Ansehen</a></td>
+      </tr>
+      {% endfor %}
+      {% if runs[v]|length == 0 %}<tr><td colspan="6" class="muted">Noch keine Läufe.</td></tr>{% endif %}
+    </tbody>
+  </table>
+</div>
+{% endfor %}
+{% endblock %}
