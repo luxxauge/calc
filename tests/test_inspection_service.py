@@ -353,9 +353,10 @@ def test_next_five_blocks_deadline_approval_notification_cycle_backup():
     obj = create_object(s, customer.id, "S1", "Obj 1")
     order = create_inspection_order(s, obj.id, "Wiederholungsprüfung")
     defect = create_defect(s, order.id, "Sichtprüfung offen", None)
+    report = create_report(s, order.id, "Hauptbericht")
 
     ddl = create_defect_deadline(s, defect.id, "2026-12-31", "Nachweis erforderlich")
-    step = create_approval_step(s, tenant.id, "report", 1, "admin")
+    step = create_approval_step(s, tenant.id, "report", report.id, "admin")
     step = update_approval_step_status(s, step.id, "approved")
     note = create_notification(s, tenant.id, "Frist", "Frist läuft in 7 Tagen ab", "defect", defect.id)
     cycle = create_inspection_cycle(s, obj.id, 48, "2027-01-31")
@@ -393,3 +394,41 @@ def test_next_six_modules_thermo_calibration_sequences_payment_retention_restore
     assert pay.invoice_id == inv.id
     assert retention.data_type == "report"
     assert restore.backup_run_id == backup.id
+
+
+def test_cross_tenant_guards_and_payment_workflow():
+    s = _make_session()
+    t1 = create_tenant(s, "T1")
+    t2 = create_tenant(s, "T2")
+    c1 = create_customer(s, t1.id, "C1")
+    c2 = create_customer(s, t2.id, "C2")
+    o1 = create_object(s, c1.id, "S1", "Obj1")
+    o2 = create_object(s, c2.id, "S2", "Obj2")
+    ord1 = create_inspection_order(s, o1.id, "Wiederholungsprüfung")
+    inv1 = create_invoice(s, ord1.id, 10000)
+    inv1 = update_invoice_status(s, inv1.id, "freigegeben")
+    inv1 = update_invoice_status(s, inv1.id, "finalisiert")
+    inv1 = update_invoice_status(s, inv1.id, "versendet")
+
+    # document cross-tenant guard
+    try:
+        create_document_record(
+            s,
+            tenant_id=t1.id,
+            file_name="x.pdf",
+            category="report",
+            visibility="internal",
+            object_id=o2.id,
+            inspection_order_id=None,
+            defect_id=None,
+            report_id=None,
+        )
+    except ValueError as exc:
+        assert "gehört nicht zum Mandanten" in str(exc)
+    else:
+        raise AssertionError("Expected cross-tenant document guard")
+
+    # payment updates invoice to paid when total reached
+    create_payment_entry(s, inv1.id, 10000)
+    inv1_refetched = s.get(InspInvoice, inv1.id)
+    assert inv1_refetched.status == "bezahlt"

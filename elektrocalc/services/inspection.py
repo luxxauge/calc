@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from elektrocalc.db.models import (
@@ -514,6 +514,22 @@ def create_document_record(
 ) -> InspDocument:
     if session.get(InspTenant, tenant_id) is None:
         raise ValueError("Mandant nicht gefunden")
+    if object_id:
+        obj = session.get(InspObject, object_id)
+        if obj is None or obj.tenant_id != tenant_id:
+            raise ValueError("Objekt gehört nicht zum Mandanten")
+    if inspection_order_id:
+        order = session.get(InspInspectionOrder, inspection_order_id)
+        if order is None or order.tenant_id != tenant_id:
+            raise ValueError("Prüfauftrag gehört nicht zum Mandanten")
+    if defect_id:
+        defect = session.get(InspDefect, defect_id)
+        if defect is None or defect.tenant_id != tenant_id:
+            raise ValueError("Mangel gehört nicht zum Mandanten")
+    if report_id:
+        report = session.get(InspReport, report_id)
+        if report is None or report.tenant_id != tenant_id:
+            raise ValueError("Bericht gehört nicht zum Mandanten")
     if not any([object_id, inspection_order_id, defect_id, report_id]):
         raise ValueError("Dokument braucht mindestens einen Fachbezug")
     doc = InspDocument(
@@ -543,10 +559,18 @@ def create_communication_entry(
 ) -> InspCommunicationEntry:
     if session.get(InspTenant, tenant_id) is None:
         raise ValueError("Mandant nicht gefunden")
-    if task_id and session.get(InspTask, task_id) is None:
-        raise ValueError("Aufgabe nicht gefunden")
-    if customer_id and session.get(InspCustomer, customer_id) is None:
-        raise ValueError("Kunde nicht gefunden")
+    if task_id:
+        task = session.get(InspTask, task_id)
+        if task is None:
+            raise ValueError("Aufgabe nicht gefunden")
+        if task.tenant_id != tenant_id:
+            raise ValueError("Aufgabe gehört nicht zum Mandanten")
+    if customer_id:
+        customer = session.get(InspCustomer, customer_id)
+        if customer is None:
+            raise ValueError("Kunde nicht gefunden")
+        if customer.tenant_id != tenant_id:
+            raise ValueError("Kunde gehört nicht zum Mandanten")
     entry = InspCommunicationEntry(
         tenant_id=tenant_id,
         message=message.strip(),
@@ -607,9 +631,20 @@ def create_approval_step(
 ) -> InspApprovalStep:
     if session.get(InspTenant, tenant_id) is None:
         raise ValueError("Mandant nicht gefunden")
+    target_type_clean = target_type.strip().lower()
+    if target_type_clean == "report":
+        target = session.get(InspReport, target_id)
+    elif target_type_clean == "invoice":
+        target = session.get(InspInvoice, target_id)
+    elif target_type_clean == "inspection_order":
+        target = session.get(InspInspectionOrder, target_id)
+    else:
+        raise ValueError("target_type muss report|invoice|inspection_order sein")
+    if target is None or getattr(target, "tenant_id", None) != tenant_id:
+        raise ValueError("Freigabeziel gehört nicht zum Mandanten")
     step = InspApprovalStep(
         tenant_id=tenant_id,
-        target_type=target_type.strip().lower(),
+        target_type=target_type_clean,
         target_id=target_id,
         required_role=required_role.strip().lower(),
         status="pending",
@@ -644,6 +679,18 @@ def create_notification(
 ) -> InspNotification:
     if session.get(InspTenant, tenant_id) is None:
         raise ValueError("Mandant nicht gefunden")
+    if related_type and related_id:
+        rtype = related_type.strip().lower()
+        if rtype == "defect":
+            rel = session.get(InspDefect, related_id)
+        elif rtype == "task":
+            rel = session.get(InspTask, related_id)
+        elif rtype == "report":
+            rel = session.get(InspReport, related_id)
+        else:
+            raise ValueError("related_type muss defect|task|report sein")
+        if rel is None or rel.tenant_id != tenant_id:
+            raise ValueError("Verknüpftes Objekt gehört nicht zum Mandanten")
     notification = InspNotification(
         tenant_id=tenant_id,
         title=title.strip(),
@@ -667,6 +714,14 @@ def create_inspection_cycle(
     obj = session.get(InspObject, object_id)
     if obj is None:
         raise ValueError("Objekt nicht gefunden")
+    existing = session.execute(
+        select(InspInspectionCycle).where(
+            InspInspectionCycle.object_id == obj.id,
+            InspInspectionCycle.status == "active",
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise ValueError("Für das Objekt existiert bereits ein aktiver Prüfzyklus")
     cycle = InspInspectionCycle(
         tenant_id=obj.tenant_id,
         object_id=obj.id,
@@ -689,9 +744,12 @@ def create_backup_run(
 ) -> InspBackupRun:
     if session.get(InspTenant, tenant_id) is None:
         raise ValueError("Mandant nicht gefunden")
+    status_clean = status.strip().lower() or "ok"
+    if status_clean not in {"ok", "failed"}:
+        raise ValueError("Backup-Status muss ok|failed sein")
     backup = InspBackupRun(
         tenant_id=tenant_id,
-        status=status.strip().lower() or "ok",
+        status=status_clean,
         location=(location or "").strip() or None,
         finished_at=datetime.fromisoformat(finished_at.strip()) if finished_at else None,
     )
@@ -711,6 +769,12 @@ def create_thermography_entry(
     obj = session.get(InspObject, object_id)
     if obj is None:
         raise ValueError("Objekt nicht gefunden")
+    if defect_id:
+        defect = session.get(InspDefect, defect_id)
+        if defect is None:
+            raise ValueError("Mangel nicht gefunden")
+        if defect.tenant_id != obj.tenant_id or defect.object_id != obj.id:
+            raise ValueError("Mangel passt nicht zum Objekt/Mandanten")
     entry = InspThermographyEntry(
         tenant_id=obj.tenant_id,
         object_id=obj.id,
@@ -734,11 +798,15 @@ def create_device_calibration(
     device = session.get(InspMeasuringDevice, device_id)
     if device is None:
         raise ValueError("Messgerät nicht gefunden")
+    calibrated = datetime.strptime(calibrated_at, "%Y-%m-%d").date()
+    valid = datetime.strptime(valid_until, "%Y-%m-%d").date()
+    if valid < calibrated:
+        raise ValueError("valid_until darf nicht vor calibrated_at liegen")
     calibration = InspDeviceCalibration(
         tenant_id=device.tenant_id,
         measuring_device_id=device.id,
-        calibrated_at=datetime.strptime(calibrated_at, "%Y-%m-%d").date(),
-        valid_until=datetime.strptime(valid_until, "%Y-%m-%d").date(),
+        calibrated_at=calibrated,
+        valid_until=valid,
         certificate_ref=(certificate_ref or "").strip() or None,
     )
     session.add(calibration)
@@ -790,6 +858,12 @@ def create_payment_entry(session: Session, invoice_id: int, amount_cent: int) ->
     session.add(payment)
     session.commit()
     session.refresh(payment)
+    total_paid = session.execute(
+        select(func.coalesce(func.sum(InspPaymentEntry.amount_cent), 0)).where(InspPaymentEntry.invoice_id == invoice.id)
+    ).scalar_one()
+    if total_paid >= invoice.total_cent and invoice.status == "versendet":
+        invoice.status = "bezahlt"
+        session.commit()
     return payment
 
 
@@ -824,6 +898,12 @@ def create_restore_test(
 ) -> InspRestoreTest:
     if session.get(InspTenant, tenant_id) is None:
         raise ValueError("Mandant nicht gefunden")
+    if backup_run_id:
+        backup = session.get(InspBackupRun, backup_run_id)
+        if backup is None:
+            raise ValueError("Backup-Run nicht gefunden")
+        if backup.tenant_id != tenant_id:
+            raise ValueError("Backup-Run gehört nicht zum Mandanten")
     restore = InspRestoreTest(
         tenant_id=tenant_id,
         backup_run_id=backup_run_id,
