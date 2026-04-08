@@ -66,6 +66,13 @@ from elektrocalc.services.inspection import (
     create_notification as create_inspection_notification,
     create_inspection_cycle as create_inspection_cycle_entry,
     create_backup_run as create_inspection_backup_run,
+    create_thermography_entry as create_inspection_thermography_entry,
+    create_device_calibration as create_inspection_device_calibration,
+    create_number_sequence as create_inspection_number_sequence,
+    issue_next_number as issue_inspection_number,
+    create_payment_entry as create_inspection_payment_entry,
+    create_data_retention_rule as create_inspection_retention_rule,
+    create_restore_test as create_inspection_restore_test,
 )
 from elektrocalc.db.models import Item
 
@@ -1701,6 +1708,120 @@ def inspection_create_backup_run(
                 status=status,
                 location=location,
                 finished_at=finished_at,
+            )
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/thermography/create")
+def inspection_create_thermography(
+    object_id: int = Form(...),
+    defect_id: int | None = Form(None),
+    image_ref: str = Form(...),
+    max_temp_c: str | None = Form(None),
+):
+    try:
+        with SessionFactory() as s:
+            create_inspection_thermography_entry(
+                s,
+                object_id=object_id,
+                defect_id=defect_id,
+                image_ref=image_ref,
+                max_temp_c=max_temp_c,
+            )
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/calibrations/create")
+def inspection_create_calibration(
+    device_id: int = Form(...),
+    calibrated_at: str = Form(...),
+    valid_until: str = Form(...),
+    certificate_ref: str | None = Form(None),
+):
+    try:
+        with SessionFactory() as s:
+            create_inspection_device_calibration(
+                s,
+                device_id=device_id,
+                calibrated_at=calibrated_at,
+                valid_until=valid_until,
+                certificate_ref=certificate_ref,
+            )
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/number-sequences/create")
+def inspection_create_number_sequence(tenant_id: int = Form(...), scope: str = Form(...), prefix: str = Form("")):
+    try:
+        with SessionFactory() as s:
+            create_inspection_number_sequence(s, tenant_id=tenant_id, scope=scope, prefix=prefix)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/number-sequences/issue")
+def inspection_issue_number(sequence_id: int = Form(...)):
+    try:
+        with SessionFactory() as s:
+            issued = issue_inspection_number(s, sequence_id=sequence_id)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url=f"/inspection?error={urllib.parse.quote('Nummer vergeben: ' + issued)}", status_code=303)
+
+
+@app.post("/inspection/payments/create")
+def inspection_create_payment(invoice_id: int = Form(...), amount_cent: int = Form(...)):
+    try:
+        with SessionFactory() as s:
+            create_inspection_payment_entry(s, invoice_id=invoice_id, amount_cent=amount_cent)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/retention-rules/create")
+def inspection_create_retention_rule(
+    tenant_id: int = Form(...),
+    data_type: str = Form(...),
+    retention_days: int = Form(...),
+    delete_mode: str = Form("archive"),
+):
+    try:
+        with SessionFactory() as s:
+            create_inspection_retention_rule(
+                s,
+                tenant_id=tenant_id,
+                data_type=data_type,
+                retention_days=retention_days,
+                delete_mode=delete_mode,
+            )
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/restore-tests/create")
+def inspection_create_restore_test(
+    tenant_id: int = Form(...),
+    backup_run_id: int | None = Form(None),
+    status: str = Form("passed"),
+    notes: str | None = Form(None),
+):
+    try:
+        with SessionFactory() as s:
+            create_inspection_restore_test(
+                s,
+                tenant_id=tenant_id,
+                backup_run_id=backup_run_id,
+                status=status,
+                notes=notes,
             )
     except ValueError as exc:
         return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)

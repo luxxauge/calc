@@ -26,6 +26,12 @@ from elektrocalc.db.models import (
     InspNotification,
     InspInspectionCycle,
     InspBackupRun,
+    InspThermographyEntry,
+    InspDeviceCalibration,
+    InspNumberSequence,
+    InspPaymentEntry,
+    InspDataRetentionRule,
+    InspRestoreTest,
     InspObject,
     InspPortalRelease,
     InspReport,
@@ -63,6 +69,13 @@ from elektrocalc.services.inspection import (
     create_notification,
     create_inspection_cycle,
     create_backup_run,
+    create_thermography_entry,
+    create_device_calibration,
+    create_number_sequence,
+    issue_next_number,
+    create_payment_entry,
+    create_data_retention_rule,
+    create_restore_test,
 )
 
 
@@ -93,6 +106,12 @@ def _make_session():
         InspNotification.__table__,
         InspInspectionCycle.__table__,
         InspBackupRun.__table__,
+        InspThermographyEntry.__table__,
+        InspDeviceCalibration.__table__,
+        InspNumberSequence.__table__,
+        InspPaymentEntry.__table__,
+        InspDataRetentionRule.__table__,
+        InspRestoreTest.__table__,
         InspPortalRelease.__table__,
     ]
     for table in insp_tables:
@@ -347,3 +366,30 @@ def test_next_five_blocks_deadline_approval_notification_cycle_backup():
     assert note.related_id == defect.id
     assert cycle.object_id == obj.id
     assert backup.status == "ok"
+
+
+def test_next_six_modules_thermo_calibration_sequences_payment_retention_restore():
+    s = _make_session()
+    tenant = create_tenant(s, "T1")
+    customer = create_customer(s, tenant.id, "C1")
+    obj = create_object(s, customer.id, "S1", "Obj 1")
+    order = create_inspection_order(s, obj.id, "Wiederholungsprüfung")
+    defect = create_defect(s, order.id, "Warmstelle", None)
+    inv = create_invoice(s, order.id, 50000)
+    dev = create_measuring_device(s, tenant.id, "Testo", "SN-22", "2026-12-31")
+    backup = create_backup_run(s, tenant.id, "ok", "/tmp/bkp", "2026-04-08T08:00:00")
+
+    thermo = create_thermography_entry(s, obj.id, defect.id, "thermo_001.jpg", "84.2")
+    calib = create_device_calibration(s, dev.id, "2026-01-10", "2027-01-10", "cert-1")
+    seq = create_number_sequence(s, tenant.id, "invoice", "RE-")
+    issued = issue_next_number(s, seq.id)
+    pay = create_payment_entry(s, inv.id, 25000)
+    retention = create_data_retention_rule(s, tenant.id, "report", 3650, "archive")
+    restore = create_restore_test(s, tenant.id, backup.id, "passed", "Restore in 12min")
+
+    assert thermo.object_id == obj.id
+    assert calib.measuring_device_id == dev.id
+    assert issued.startswith("RE-")
+    assert pay.invoice_id == inv.id
+    assert retention.data_type == "report"
+    assert restore.backup_run_id == backup.id

@@ -31,6 +31,12 @@ from elektrocalc.db.models import (
     InspNotification,
     InspInspectionCycle,
     InspBackupRun,
+    InspThermographyEntry,
+    InspDeviceCalibration,
+    InspNumberSequence,
+    InspPaymentEntry,
+    InspDataRetentionRule,
+    InspRestoreTest,
 )
 
 
@@ -695,6 +701,141 @@ def create_backup_run(
     return backup
 
 
+def create_thermography_entry(
+    session: Session,
+    object_id: int,
+    defect_id: int | None,
+    image_ref: str,
+    max_temp_c: str | None,
+) -> InspThermographyEntry:
+    obj = session.get(InspObject, object_id)
+    if obj is None:
+        raise ValueError("Objekt nicht gefunden")
+    entry = InspThermographyEntry(
+        tenant_id=obj.tenant_id,
+        object_id=obj.id,
+        defect_id=defect_id,
+        image_ref=image_ref.strip(),
+        max_temp_c=(max_temp_c or "").strip() or None,
+    )
+    session.add(entry)
+    session.commit()
+    session.refresh(entry)
+    return entry
+
+
+def create_device_calibration(
+    session: Session,
+    device_id: int,
+    calibrated_at: str,
+    valid_until: str,
+    certificate_ref: str | None,
+) -> InspDeviceCalibration:
+    device = session.get(InspMeasuringDevice, device_id)
+    if device is None:
+        raise ValueError("Messgerät nicht gefunden")
+    calibration = InspDeviceCalibration(
+        tenant_id=device.tenant_id,
+        measuring_device_id=device.id,
+        calibrated_at=datetime.strptime(calibrated_at, "%Y-%m-%d").date(),
+        valid_until=datetime.strptime(valid_until, "%Y-%m-%d").date(),
+        certificate_ref=(certificate_ref or "").strip() or None,
+    )
+    session.add(calibration)
+    session.commit()
+    session.refresh(calibration)
+    return calibration
+
+
+def create_number_sequence(session: Session, tenant_id: int, scope: str, prefix: str) -> InspNumberSequence:
+    if session.get(InspTenant, tenant_id) is None:
+        raise ValueError("Mandant nicht gefunden")
+    seq = InspNumberSequence(
+        tenant_id=tenant_id,
+        scope=scope.strip().lower(),
+        prefix=(prefix or "").strip(),
+        next_number=1,
+    )
+    session.add(seq)
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise ValueError("Nummernkreis existiert bereits") from exc
+    session.refresh(seq)
+    return seq
+
+
+def issue_next_number(session: Session, sequence_id: int) -> str:
+    seq = session.get(InspNumberSequence, sequence_id)
+    if seq is None:
+        raise ValueError("Nummernkreis nicht gefunden")
+    current = seq.next_number
+    seq.next_number = current + 1
+    session.commit()
+    session.refresh(seq)
+    return f"{seq.prefix}{current:05d}"
+
+
+def create_payment_entry(session: Session, invoice_id: int, amount_cent: int) -> InspPaymentEntry:
+    invoice = session.get(InspInvoice, invoice_id)
+    if invoice is None:
+        raise ValueError("Rechnung nicht gefunden")
+    payment = InspPaymentEntry(
+        tenant_id=invoice.tenant_id,
+        invoice_id=invoice.id,
+        amount_cent=max(0, int(amount_cent)),
+        status="booked",
+    )
+    session.add(payment)
+    session.commit()
+    session.refresh(payment)
+    return payment
+
+
+def create_data_retention_rule(
+    session: Session,
+    tenant_id: int,
+    data_type: str,
+    retention_days: int,
+    delete_mode: str,
+) -> InspDataRetentionRule:
+    if session.get(InspTenant, tenant_id) is None:
+        raise ValueError("Mandant nicht gefunden")
+    rule = InspDataRetentionRule(
+        tenant_id=tenant_id,
+        data_type=data_type.strip().lower(),
+        retention_days=max(1, int(retention_days)),
+        delete_mode=delete_mode.strip().lower() or "archive",
+        active=True,
+    )
+    session.add(rule)
+    session.commit()
+    session.refresh(rule)
+    return rule
+
+
+def create_restore_test(
+    session: Session,
+    tenant_id: int,
+    backup_run_id: int | None,
+    status: str,
+    notes: str | None,
+) -> InspRestoreTest:
+    if session.get(InspTenant, tenant_id) is None:
+        raise ValueError("Mandant nicht gefunden")
+    restore = InspRestoreTest(
+        tenant_id=tenant_id,
+        backup_run_id=backup_run_id,
+        status=status.strip().lower() or "passed",
+        notes=(notes or "").strip() or None,
+    )
+    session.add(restore)
+    session.commit()
+    session.refresh(restore)
+    return restore
+
+
 def inspection_dashboard_data(session: Session) -> dict[str, list]:
     order_distribution_links = list(
         session.execute(
@@ -726,4 +867,10 @@ def inspection_dashboard_data(session: Session) -> dict[str, list]:
         "notifications": list(session.execute(select(InspNotification).order_by(InspNotification.id.desc()).limit(30)).scalars().all()),
         "inspection_cycles": list(session.execute(select(InspInspectionCycle).order_by(InspInspectionCycle.id.desc()).limit(30)).scalars().all()),
         "backup_runs": list(session.execute(select(InspBackupRun).order_by(InspBackupRun.id.desc()).limit(30)).scalars().all()),
+        "thermography_entries": list(session.execute(select(InspThermographyEntry).order_by(InspThermographyEntry.id.desc()).limit(30)).scalars().all()),
+        "device_calibrations": list(session.execute(select(InspDeviceCalibration).order_by(InspDeviceCalibration.id.desc()).limit(30)).scalars().all()),
+        "number_sequences": list(session.execute(select(InspNumberSequence).order_by(InspNumberSequence.id.desc()).limit(30)).scalars().all()),
+        "payment_entries": list(session.execute(select(InspPaymentEntry).order_by(InspPaymentEntry.id.desc()).limit(30)).scalars().all()),
+        "retention_rules": list(session.execute(select(InspDataRetentionRule).order_by(InspDataRetentionRule.id.desc()).limit(30)).scalars().all()),
+        "restore_tests": list(session.execute(select(InspRestoreTest).order_by(InspRestoreTest.id.desc()).limit(30)).scalars().all()),
     }

@@ -107,3 +107,4 @@ Keine externen CDNs. Alles lokal.
 - Weitere Module: Geräteverwaltung, DMS-Dokumentbezug, Kommunikationslogik und Audit-Log mit Erfassungsformularen im Inspection-Dashboard.
 - Freigabe-/Finalisierungslogik erweitert: Status-Workflows für Prüfauftrag und Bericht; Messwerte/Teilberichte werden nach Finalisierung gesperrt.
 - Nächste 5 Blöcke umgesetzt: Mängelfristen, Freigabeschritte, Benachrichtigungen, Prüfzyklen und Backup-Run-Logging.
+- Nächste 6 Module umgesetzt: Thermografie, Gerätekalibrierungen, Nummernkreise, Zahlungseinträge, Datenaufbewahrungsregeln und Restore-Tests.

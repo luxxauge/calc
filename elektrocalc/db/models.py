@@ -1046,3 +1046,72 @@ class InspBackupRun(Base):
     location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class InspThermographyEntry(Base):
+    __tablename__ = "insp_thermography_entry"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    object_id: Mapped[int] = mapped_column(ForeignKey("insp_object.id", ondelete="CASCADE"), nullable=False, index=True)
+    defect_id: Mapped[Optional[int]] = mapped_column(ForeignKey("insp_defect.id", ondelete="CASCADE"), nullable=True, index=True)
+    image_ref: Mapped[str] = mapped_column(String(255), nullable=False)
+    max_temp_c: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class InspDeviceCalibration(Base):
+    __tablename__ = "insp_device_calibration"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    measuring_device_id: Mapped[int] = mapped_column(ForeignKey("insp_measuring_device.id", ondelete="CASCADE"), nullable=False, index=True)
+    calibrated_at: Mapped[date] = mapped_column(Date, nullable=False)
+    valid_until: Mapped[date] = mapped_column(Date, nullable=False)
+    certificate_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+
+class InspNumberSequence(Base):
+    __tablename__ = "insp_number_sequence"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "scope", name="uq_insp_number_sequence_scope"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    scope: Mapped[str] = mapped_column(String(64), nullable=False)
+    prefix: Mapped[str] = mapped_column(String(16), nullable=False, default="")
+    next_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+
+class InspPaymentEntry(Base):
+    __tablename__ = "insp_payment_entry"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("insp_invoice.id", ondelete="CASCADE"), nullable=False, index=True)
+    amount_cent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="booked")
+    booked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class InspDataRetentionRule(Base):
+    __tablename__ = "insp_data_retention_rule"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    data_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    retention_days: Mapped[int] = mapped_column(Integer, nullable=False, default=3650)
+    delete_mode: Mapped[str] = mapped_column(String(32), nullable=False, default="archive")
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class InspRestoreTest(Base):
+    __tablename__ = "insp_restore_test"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    backup_run_id: Mapped[Optional[int]] = mapped_column(ForeignKey("insp_backup_run.id", ondelete="SET NULL"), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="passed")
+    tested_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
