@@ -3,9 +3,13 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 import tempfile
+import urllib.parse
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from fastapi import FastAPI, Request, Form, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
@@ -32,6 +36,37 @@ from elektrocalc.services.plan_export import build_quantities_xlsx, build_quanti
 from elektrocalc.services.rate_card import get_default_card, list_lines as list_rate_lines, upsert_line as upsert_rate_line, delete_line as delete_rate_line, seed_defaults_if_empty as seed_ratecard_if_empty
 from elektrocalc.services.param_rules import list_rules as list_param_rules, create_rule as create_param_rule, delete_rule as delete_param_rule, seed_defaults_if_empty as seed_param_rules_if_empty
 from elektrocalc.services.labor_catalog import list_tasks, list_rules, create_task, delete_task, create_rule, delete_rule, seed_defaults_if_empty
+from elektrocalc.services.inspection import (
+    inspection_dashboard_data,
+    create_tenant as create_inspection_tenant,
+    create_customer as create_inspection_customer,
+    create_object as create_inspection_object,
+    add_distribution as create_inspection_distribution,
+    create_inspection_order as create_inspection_order_entry,
+    assign_distribution_to_order as assign_distribution_to_order_entry,
+    create_defect as create_inspection_defect,
+    create_appointment as create_inspection_appointment,
+    create_measurement_set as create_inspection_measurement_set,
+    create_measurement as create_inspection_measurement,
+    create_report as create_inspection_report,
+    update_report_status as update_inspection_report_status,
+    create_distribution_report as create_inspection_distribution_report,
+    update_inspection_order_status as update_inspection_order_status_entry,
+    create_task as create_inspection_task,
+    create_invoice as create_inspection_invoice,
+    update_invoice_total as update_inspection_invoice_total,
+    update_invoice_status as update_inspection_invoice_status,
+    create_portal_release as create_inspection_portal_release,
+    create_measuring_device as create_inspection_measuring_device,
+    create_document_record as create_inspection_document_record,
+    create_communication_entry as create_inspection_communication_entry,
+    create_defect_deadline as create_inspection_defect_deadline,
+    create_approval_step as create_inspection_approval_step,
+    update_approval_step_status as update_inspection_approval_step_status,
+    create_notification as create_inspection_notification,
+    create_inspection_cycle as create_inspection_cycle_entry,
+    create_backup_run as create_inspection_backup_run,
+)
 from elektrocalc.db.models import Item
 
 def _build_lv_compare_data(s: Session, doc_id: int):
@@ -72,7 +107,7 @@ def _build_lv_compare_data(s: Session, doc_id: int):
         summ = summarize_estimate(lines, extras)
         summaries.append({"variant": v, **summ, "estimate_id": est.id})
 
-    positions = list_lv_positions(s, doc_id)
+    positions = list_positions(s, doc_id)
     rows = []
     for p in positions:
         pid = int(p.id)
@@ -610,7 +645,7 @@ def lv_compare_page(request: Request, doc_id: int):
             summaries.append({"variant": v, **summ, "estimate_id": est.id})
 
         # Positions
-        positions = list_lv_positions(s, doc_id)
+        positions = list_positions(s, doc_id)
         pos_map = {p.id: p for p in positions}
 
         rows = []
@@ -1258,3 +1293,415 @@ def project_mapping_delete(project_id: int, mapping_id: int):
         delete_mapping(s, mapping_id)
     return RedirectResponse(url=f"/projects/{project_id}/mapping", status_code=303)
 
+
+
+@app.get("/inspection", response_class=HTMLResponse)
+def inspection_dashboard(request: Request, error: str | None = None):
+    with SessionFactory() as s:
+        data = inspection_dashboard_data(s)
+    return templates.TemplateResponse("inspection_dashboard.html", {"request": request, "error": error, **data})
+
+
+@app.post("/inspection/tenants/create")
+def inspection_create_tenant(name: str = Form(...)):
+    try:
+        with SessionFactory() as s:
+            create_inspection_tenant(s, name=name)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/customers/create")
+def inspection_create_customer(tenant_id: int = Form(...), name: str = Form(...)):
+    try:
+        with SessionFactory() as s:
+            create_inspection_customer(s, tenant_id=tenant_id, name=name)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/objects/create")
+def inspection_create_object(customer_id: int = Form(...), site_name: str = Form(...), object_name: str = Form(...)):
+    try:
+        with SessionFactory() as s:
+            create_inspection_object(s, customer_id=customer_id, site_name=site_name, object_name=object_name)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/distributions/create")
+def inspection_create_distribution(object_id: int = Form(...), label: str = Form(...)):
+    try:
+        with SessionFactory() as s:
+            create_inspection_distribution(s, object_id=object_id, label=label)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/orders/create")
+def inspection_create_order(object_id: int = Form(...), reason: str = Form(...)):
+    try:
+        with SessionFactory() as s:
+            create_inspection_order_entry(s, object_id=object_id, reason=reason)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/orders/status")
+def inspection_update_order_status(order_id: int = Form(...), new_status: str = Form(...)):
+    try:
+        with SessionFactory() as s:
+            update_inspection_order_status_entry(s, order_id=order_id, new_status=new_status)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/order-distributions/create")
+def inspection_assign_order_distribution(order_id: int = Form(...), distribution_id: int = Form(...)):
+    try:
+        with SessionFactory() as s:
+            assign_distribution_to_order_entry(s, order_id=order_id, distribution_id=distribution_id)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/defects/create")
+def inspection_create_defect(order_id: int = Form(...), title: str = Form(...), due_date: str | None = Form(None)):
+    try:
+        with SessionFactory() as s:
+            create_inspection_defect(s, order_id=order_id, title=title, due_date=due_date)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/appointments/create")
+def inspection_create_appointment(order_id: int = Form(...), starts_at: str = Form(...), ends_at: str | None = Form(None)):
+    try:
+        with SessionFactory() as s:
+            create_inspection_appointment(s, order_id=order_id, starts_at=starts_at, ends_at=ends_at)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/measurement-sets/create")
+def inspection_create_measurement_set(order_id: int = Form(...), title: str = Form(...)):
+    try:
+        with SessionFactory() as s:
+            create_inspection_measurement_set(s, order_id=order_id, title=title)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/measurements/create")
+def inspection_create_measurement(
+    measurement_set_id: int = Form(...),
+    point_label: str = Form(...),
+    measured_value: str = Form(...),
+    unit: str = Form(...),
+):
+    try:
+        with SessionFactory() as s:
+            create_inspection_measurement(
+                s,
+                measurement_set_id=measurement_set_id,
+                point_label=point_label,
+                measured_value=measured_value,
+                unit=unit,
+            )
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/reports/create")
+def inspection_create_report(order_id: int = Form(...), title: str = Form(...)):
+    try:
+        with SessionFactory() as s:
+            create_inspection_report(s, order_id=order_id, title=title)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/reports/status")
+def inspection_update_report_status(report_id: int = Form(...), new_status: str = Form(...)):
+    try:
+        with SessionFactory() as s:
+            update_inspection_report_status(s, report_id=report_id, new_status=new_status)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/distribution-reports/create")
+def inspection_create_distribution_report(
+    report_id: int = Form(...),
+    distribution_id: int = Form(...),
+    summary: str | None = Form(None),
+):
+    try:
+        with SessionFactory() as s:
+            create_inspection_distribution_report(
+                s,
+                report_id=report_id,
+                distribution_id=distribution_id,
+                summary=summary,
+            )
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/tasks/create")
+def inspection_create_task(
+    tenant_id: int = Form(...),
+    title: str = Form(...),
+    object_id: int | None = Form(None),
+    defect_id: int | None = Form(None),
+    report_id: int | None = Form(None),
+):
+    try:
+        with SessionFactory() as s:
+            create_inspection_task(
+                s,
+                tenant_id=tenant_id,
+                title=title,
+                object_id=object_id,
+                defect_id=defect_id,
+                report_id=report_id,
+            )
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/invoices/create")
+def inspection_create_invoice(order_id: int = Form(...), total_cent: int = Form(...)):
+    try:
+        with SessionFactory() as s:
+            create_inspection_invoice(s, order_id=order_id, total_cent=total_cent)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/invoices/total")
+def inspection_update_invoice_total(invoice_id: int = Form(...), total_cent: int = Form(...)):
+    try:
+        with SessionFactory() as s:
+            update_inspection_invoice_total(s, invoice_id=invoice_id, total_cent=total_cent)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/invoices/status")
+def inspection_update_invoice_status(invoice_id: int = Form(...), new_status: str = Form(...)):
+    try:
+        with SessionFactory() as s:
+            update_inspection_invoice_status(s, invoice_id=invoice_id, new_status=new_status)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/portal-releases/create")
+def inspection_create_portal_release(
+    customer_id: int = Form(...),
+    release_type: str = Form(...),
+    target_id: int = Form(...),
+):
+    try:
+        with SessionFactory() as s:
+            create_inspection_portal_release(
+                s,
+                customer_id=customer_id,
+                release_type=release_type,
+                target_id=target_id,
+            )
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/devices/create")
+def inspection_create_device(
+    tenant_id: int = Form(...),
+    name: str = Form(...),
+    serial_no: str | None = Form(None),
+    calibration_due: str | None = Form(None),
+):
+    try:
+        with SessionFactory() as s:
+            create_inspection_measuring_device(
+                s,
+                tenant_id=tenant_id,
+                name=name,
+                serial_no=serial_no,
+                calibration_due=calibration_due,
+            )
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/documents/create")
+def inspection_create_document_record(
+    tenant_id: int = Form(...),
+    file_name: str = Form(...),
+    category: str = Form("general"),
+    visibility: str = Form("internal"),
+    object_id: int | None = Form(None),
+    inspection_order_id: int | None = Form(None),
+    defect_id: int | None = Form(None),
+    report_id: int | None = Form(None),
+):
+    try:
+        with SessionFactory() as s:
+            create_inspection_document_record(
+                s,
+                tenant_id=tenant_id,
+                file_name=file_name,
+                category=category,
+                visibility=visibility,
+                object_id=object_id,
+                inspection_order_id=inspection_order_id,
+                defect_id=defect_id,
+                report_id=report_id,
+            )
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/communication/create")
+def inspection_create_communication(
+    tenant_id: int = Form(...),
+    message: str = Form(...),
+    direction: str = Form("internal"),
+    task_id: int | None = Form(None),
+    customer_id: int | None = Form(None),
+):
+    try:
+        with SessionFactory() as s:
+            create_inspection_communication_entry(
+                s,
+                tenant_id=tenant_id,
+                message=message,
+                direction=direction,
+                task_id=task_id,
+                customer_id=customer_id,
+            )
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/defect-deadlines/create")
+def inspection_create_defect_deadline(defect_id: int = Form(...), due_date: str = Form(...), note: str | None = Form(None)):
+    try:
+        with SessionFactory() as s:
+            create_inspection_defect_deadline(s, defect_id=defect_id, due_date=due_date, note=note)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/approval-steps/create")
+def inspection_create_approval_step(
+    tenant_id: int = Form(...),
+    target_type: str = Form(...),
+    target_id: int = Form(...),
+    required_role: str = Form(...),
+):
+    try:
+        with SessionFactory() as s:
+            create_inspection_approval_step(
+                s,
+                tenant_id=tenant_id,
+                target_type=target_type,
+                target_id=target_id,
+                required_role=required_role,
+            )
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/approval-steps/status")
+def inspection_update_approval_step_status(step_id: int = Form(...), new_status: str = Form(...)):
+    try:
+        with SessionFactory() as s:
+            update_inspection_approval_step_status(s, step_id=step_id, new_status=new_status)
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/notifications/create")
+def inspection_create_notification(
+    tenant_id: int = Form(...),
+    title: str = Form(...),
+    message: str = Form(...),
+    related_type: str | None = Form(None),
+    related_id: int | None = Form(None),
+):
+    try:
+        with SessionFactory() as s:
+            create_inspection_notification(
+                s,
+                tenant_id=tenant_id,
+                title=title,
+                message=message,
+                related_type=related_type,
+                related_id=related_id,
+            )
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/cycles/create")
+def inspection_create_cycle(object_id: int = Form(...), interval_months: int = Form(...), next_due_date: str = Form(...)):
+    try:
+        with SessionFactory() as s:
+            create_inspection_cycle_entry(
+                s,
+                object_id=object_id,
+                interval_months=interval_months,
+                next_due_date=next_due_date,
+            )
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
+
+
+@app.post("/inspection/backups/create")
+def inspection_create_backup_run(
+    tenant_id: int = Form(...),
+    status: str = Form("ok"),
+    location: str | None = Form(None),
+    finished_at: str | None = Form(None),
+):
+    try:
+        with SessionFactory() as s:
+            create_inspection_backup_run(
+                s,
+                tenant_id=tenant_id,
+                status=status,
+                location=location,
+                finished_at=finished_at,
+            )
+    except ValueError as exc:
+        return RedirectResponse(url=f"/inspection?error={urllib.parse.quote(str(exc))}", status_code=303)
+    return RedirectResponse(url="/inspection", status_code=303)
