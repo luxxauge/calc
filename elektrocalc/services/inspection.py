@@ -39,6 +39,47 @@ from elektrocalc.db.models import (
     InspRestoreTest,
 )
 
+ORDER_STATUS_TRANSITIONS = {
+    "draft": {"planned", "archived"},
+    "planned": {"in_progress", "archived"},
+    "in_progress": {"technical_done", "archived"},
+    "technical_done": {"finalized", "archived"},
+    "finalized": {"archived"},
+    "archived": set(),
+}
+
+REPORT_STATUS_TRANSITIONS = {
+    "draft": {"for_approval", "archived"},
+    "for_approval": {"approved", "draft", "archived"},
+    "approved": {"finalized", "archived"},
+    "finalized": {"published", "archived"},
+    "published": {"archived"},
+    "archived": set(),
+}
+
+INVOICE_STATUS_TRANSITIONS = {
+    "draft": {"freigegeben", "storniert"},
+    "freigegeben": {"finalisiert", "storniert"},
+    "finalisiert": {"versendet", "korrigiert", "storniert"},
+    "versendet": {"bezahlt", "storniert", "korrigiert"},
+    "bezahlt": {"archiviert"},
+    "storniert": {"archiviert"},
+    "korrigiert": {"archiviert"},
+    "archiviert": set(),
+}
+
+
+def _require_tenant(session: Session, tenant_id: int) -> InspTenant:
+    tenant = session.get(InspTenant, tenant_id)
+    if tenant is None:
+        raise ValueError("Mandant nicht gefunden")
+    return tenant
+
+
+def _validate_transition(current_status: str, next_status: str, transition_map: dict[str, set[str]], label: str) -> None:
+    if next_status not in transition_map.get(current_status, set()):
+        raise ValueError(f"Statuswechsel {current_status} -> {next_status} ist für {label} nicht erlaubt")
+
 
 def list_tenants(session: Session) -> list[InspTenant]:
     return list(session.execute(select(InspTenant).order_by(InspTenant.name)).scalars().all())
@@ -60,9 +101,7 @@ def create_tenant(session: Session, name: str) -> InspTenant:
 
 
 def create_customer(session: Session, tenant_id: int, name: str) -> InspCustomer:
-    tenant = session.get(InspTenant, tenant_id)
-    if tenant is None:
-        raise ValueError("Mandant nicht gefunden")
+    _require_tenant(session, tenant_id)
     clean_name = name.strip()
     if not clean_name:
         raise ValueError("Kundenname darf nicht leer sein")
@@ -134,16 +173,7 @@ def update_inspection_order_status(session: Session, order_id: int, new_status: 
     if order is None:
         raise ValueError("Prüfauftrag nicht gefunden")
     next_status = new_status.strip().lower()
-    allowed_next = {
-        "draft": {"planned", "archived"},
-        "planned": {"in_progress", "archived"},
-        "in_progress": {"technical_done", "archived"},
-        "technical_done": {"finalized", "archived"},
-        "finalized": {"archived"},
-        "archived": set(),
-    }
-    if next_status not in allowed_next.get(order.status, set()):
-        raise ValueError(f"Statuswechsel {order.status} -> {next_status} ist nicht erlaubt")
+    _validate_transition(order.status, next_status, ORDER_STATUS_TRANSITIONS, "Prüfauftrag")
     order.status = next_status
     session.commit()
     session.refresh(order)
@@ -287,16 +317,7 @@ def update_report_status(session: Session, report_id: int, new_status: str) -> I
     if report is None:
         raise ValueError("Bericht nicht gefunden")
     next_status = new_status.strip().lower()
-    allowed_next = {
-        "draft": {"for_approval", "archived"},
-        "for_approval": {"approved", "draft", "archived"},
-        "approved": {"finalized", "archived"},
-        "finalized": {"published", "archived"},
-        "published": {"archived"},
-        "archived": set(),
-    }
-    if next_status not in allowed_next.get(report.status, set()):
-        raise ValueError(f"Statuswechsel {report.status} -> {next_status} ist nicht erlaubt")
+    _validate_transition(report.status, next_status, REPORT_STATUS_TRANSITIONS, "Bericht")
     report.status = next_status
     session.commit()
     session.refresh(report)
@@ -459,18 +480,7 @@ def update_invoice_status(session: Session, invoice_id: int, new_status: str) ->
     if invoice is None:
         raise ValueError("Rechnung nicht gefunden")
     next_status = new_status.strip().lower()
-    allowed_next = {
-        "draft": {"freigegeben", "storniert"},
-        "freigegeben": {"finalisiert", "storniert"},
-        "finalisiert": {"versendet", "korrigiert", "storniert"},
-        "versendet": {"bezahlt", "storniert", "korrigiert"},
-        "bezahlt": {"archiviert"},
-        "storniert": {"archiviert"},
-        "korrigiert": {"archiviert"},
-        "archiviert": set(),
-    }
-    if next_status not in allowed_next.get(invoice.status, set()):
-        raise ValueError(f"Statuswechsel {invoice.status} -> {next_status} ist nicht erlaubt")
+    _validate_transition(invoice.status, next_status, INVOICE_STATUS_TRANSITIONS, "Rechnung")
     invoice.status = next_status
     session.commit()
     session.refresh(invoice)
@@ -485,8 +495,7 @@ def create_measuring_device(
     serial_no: str | None,
     calibration_due: str | None,
 ) -> InspMeasuringDevice:
-    if session.get(InspTenant, tenant_id) is None:
-        raise ValueError("Mandant nicht gefunden")
+    _require_tenant(session, tenant_id)
     device = InspMeasuringDevice(
         tenant_id=tenant_id,
         name=name.strip(),
@@ -512,8 +521,7 @@ def create_document_record(
     defect_id: int | None,
     report_id: int | None,
 ) -> InspDocument:
-    if session.get(InspTenant, tenant_id) is None:
-        raise ValueError("Mandant nicht gefunden")
+    _require_tenant(session, tenant_id)
     if object_id:
         obj = session.get(InspObject, object_id)
         if obj is None or obj.tenant_id != tenant_id:
@@ -557,8 +565,7 @@ def create_communication_entry(
     task_id: int | None,
     customer_id: int | None,
 ) -> InspCommunicationEntry:
-    if session.get(InspTenant, tenant_id) is None:
-        raise ValueError("Mandant nicht gefunden")
+    _require_tenant(session, tenant_id)
     if task_id:
         task = session.get(InspTask, task_id)
         if task is None:
@@ -629,8 +636,7 @@ def create_approval_step(
     target_id: int,
     required_role: str,
 ) -> InspApprovalStep:
-    if session.get(InspTenant, tenant_id) is None:
-        raise ValueError("Mandant nicht gefunden")
+    _require_tenant(session, tenant_id)
     target_type_clean = target_type.strip().lower()
     if target_type_clean == "report":
         target = session.get(InspReport, target_id)
@@ -677,8 +683,7 @@ def create_notification(
     related_type: str | None,
     related_id: int | None,
 ) -> InspNotification:
-    if session.get(InspTenant, tenant_id) is None:
-        raise ValueError("Mandant nicht gefunden")
+    _require_tenant(session, tenant_id)
     if related_type and related_id:
         rtype = related_type.strip().lower()
         if rtype == "defect":
@@ -742,8 +747,7 @@ def create_backup_run(
     location: str | None,
     finished_at: str | None,
 ) -> InspBackupRun:
-    if session.get(InspTenant, tenant_id) is None:
-        raise ValueError("Mandant nicht gefunden")
+    _require_tenant(session, tenant_id)
     status_clean = status.strip().lower() or "ok"
     if status_clean not in {"ok", "failed"}:
         raise ValueError("Backup-Status muss ok|failed sein")
@@ -816,8 +820,7 @@ def create_device_calibration(
 
 
 def create_number_sequence(session: Session, tenant_id: int, scope: str, prefix: str) -> InspNumberSequence:
-    if session.get(InspTenant, tenant_id) is None:
-        raise ValueError("Mandant nicht gefunden")
+    _require_tenant(session, tenant_id)
     seq = InspNumberSequence(
         tenant_id=tenant_id,
         scope=scope.strip().lower(),
@@ -874,8 +877,7 @@ def create_data_retention_rule(
     retention_days: int,
     delete_mode: str,
 ) -> InspDataRetentionRule:
-    if session.get(InspTenant, tenant_id) is None:
-        raise ValueError("Mandant nicht gefunden")
+    _require_tenant(session, tenant_id)
     rule = InspDataRetentionRule(
         tenant_id=tenant_id,
         data_type=data_type.strip().lower(),
@@ -896,8 +898,7 @@ def create_restore_test(
     status: str,
     notes: str | None,
 ) -> InspRestoreTest:
-    if session.get(InspTenant, tenant_id) is None:
-        raise ValueError("Mandant nicht gefunden")
+    _require_tenant(session, tenant_id)
     if backup_run_id:
         backup = session.get(InspBackupRun, backup_run_id)
         if backup is None:
