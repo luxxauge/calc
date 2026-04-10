@@ -375,9 +375,7 @@ def create_task(
     defect_id: int | None,
     report_id: int | None,
 ) -> InspTask:
-    tenant = session.get(InspTenant, tenant_id)
-    if tenant is None:
-        raise ValueError("Mandant nicht gefunden")
+    _require_tenant(session, tenant_id)
     obj = session.get(InspObject, object_id) if object_id else None
     defect = session.get(InspDefect, defect_id) if defect_id else None
     report = session.get(InspReport, report_id) if report_id else None
@@ -684,13 +682,14 @@ def create_notification(
     related_id: int | None,
 ) -> InspNotification:
     _require_tenant(session, tenant_id)
+    normalized_related_type: str | None = None
     if related_type and related_id:
-        rtype = related_type.strip().lower()
-        if rtype == "defect":
+        normalized_related_type = related_type.strip().lower()
+        if normalized_related_type == "defect":
             rel = session.get(InspDefect, related_id)
-        elif rtype == "task":
+        elif normalized_related_type == "task":
             rel = session.get(InspTask, related_id)
-        elif rtype == "report":
+        elif normalized_related_type == "report":
             rel = session.get(InspReport, related_id)
         else:
             raise ValueError("related_type muss defect|task|report sein")
@@ -700,7 +699,7 @@ def create_notification(
         tenant_id=tenant_id,
         title=title.strip(),
         message=message.strip(),
-        related_type=(related_type or "").strip() or None,
+        related_type=normalized_related_type,
         related_id=related_id,
         status="open",
     )
@@ -905,10 +904,13 @@ def create_restore_test(
             raise ValueError("Backup-Run nicht gefunden")
         if backup.tenant_id != tenant_id:
             raise ValueError("Backup-Run gehört nicht zum Mandanten")
+    status_clean = status.strip().lower() or "passed"
+    if status_clean not in {"passed", "failed"}:
+        raise ValueError("Restore-Test-Status muss passed|failed sein")
     restore = InspRestoreTest(
         tenant_id=tenant_id,
         backup_run_id=backup_run_id,
-        status=status.strip().lower() or "passed",
+        status=status_clean,
         notes=(notes or "").strip() or None,
     )
     session.add(restore)

@@ -358,13 +358,14 @@ def test_next_five_blocks_deadline_approval_notification_cycle_backup():
     ddl = create_defect_deadline(s, defect.id, "2026-12-31", "Nachweis erforderlich")
     step = create_approval_step(s, tenant.id, "report", report.id, "admin")
     step = update_approval_step_status(s, step.id, "approved")
-    note = create_notification(s, tenant.id, "Frist", "Frist läuft in 7 Tagen ab", "defect", defect.id)
+    note = create_notification(s, tenant.id, "Frist", "Frist läuft in 7 Tagen ab", "DEFECT", defect.id)
     cycle = create_inspection_cycle(s, obj.id, 48, "2027-01-31")
     backup = create_backup_run(s, tenant.id, "ok", "/backups/t1.tar.zst", "2026-04-07T10:30:00")
 
     assert ddl.defect_id == defect.id
     assert step.status == "approved"
     assert note.related_id == defect.id
+    assert note.related_type == "defect"
     assert cycle.object_id == obj.id
     assert backup.status == "ok"
 
@@ -432,3 +433,16 @@ def test_cross_tenant_guards_and_payment_workflow():
     create_payment_entry(s, inv1.id, 10000)
     inv1_refetched = s.get(InspInvoice, inv1.id)
     assert inv1_refetched.status == "bezahlt"
+
+
+def test_restore_test_rejects_invalid_status():
+    s = _make_session()
+    tenant = create_tenant(s, "T1")
+    backup = create_backup_run(s, tenant.id, "ok", "/tmp/bkp", "2026-04-08T08:00:00")
+
+    try:
+        create_restore_test(s, tenant.id, backup.id, "unknown", "invalid status")
+    except ValueError as exc:
+        assert "passed|failed" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for invalid restore-test status")
