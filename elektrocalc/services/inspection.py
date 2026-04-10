@@ -68,6 +68,31 @@ INVOICE_STATUS_TRANSITIONS = {
     "archiviert": set(),
 }
 
+DEFECT_STATUS_TRANSITIONS = {
+    "open": {"assessed", "deadline_set", "follow_up", "closed"},
+    "assessed": {"deadline_set", "follow_up", "closed"},
+    "deadline_set": {"follow_up", "rechecked", "closed"},
+    "follow_up": {"rechecked", "closed"},
+    "rechecked": {"follow_up", "closed"},
+    "closed": set(),
+}
+
+TASK_STATUS_TRANSITIONS = {
+    "open": {"in_progress", "waiting", "done", "cancelled"},
+    "in_progress": {"waiting", "done", "cancelled"},
+    "waiting": {"in_progress", "done", "cancelled"},
+    "done": {"archived"},
+    "cancelled": {"archived"},
+    "archived": set(),
+}
+
+NOTIFICATION_STATUS_TRANSITIONS = {
+    "open": {"acknowledged", "resolved", "archived"},
+    "acknowledged": {"resolved", "archived"},
+    "resolved": {"archived"},
+    "archived": set(),
+}
+
 
 def _require_tenant(session: Session, tenant_id: int) -> InspTenant:
     tenant = session.get(InspTenant, tenant_id)
@@ -221,6 +246,18 @@ def create_defect(session: Session, order_id: int, title: str, due_date: str | N
         due_date=datetime.strptime(due_date, "%Y-%m-%d").date() if due_date else None,
     )
     session.add(defect)
+    session.commit()
+    session.refresh(defect)
+    return defect
+
+
+def update_defect_status(session: Session, defect_id: int, new_status: str) -> InspDefect:
+    defect = session.get(InspDefect, defect_id)
+    if defect is None:
+        raise ValueError("Mangel nicht gefunden")
+    next_status = new_status.strip().lower()
+    _validate_transition(defect.status, next_status, DEFECT_STATUS_TRANSITIONS, "Mangel")
+    defect.status = next_status
     session.commit()
     session.refresh(defect)
     return defect
@@ -396,6 +433,18 @@ def create_task(
         status="open",
     )
     session.add(task)
+    session.commit()
+    session.refresh(task)
+    return task
+
+
+def update_task_status(session: Session, task_id: int, new_status: str) -> InspTask:
+    task = session.get(InspTask, task_id)
+    if task is None:
+        raise ValueError("Aufgabe nicht gefunden")
+    next_status = new_status.strip().lower()
+    _validate_transition(task.status, next_status, TASK_STATUS_TRANSITIONS, "Aufgabe")
+    task.status = next_status
     session.commit()
     session.refresh(task)
     return task
@@ -622,6 +671,9 @@ def create_defect_deadline(session: Session, defect_id: int, due_date: str, note
         note=(note or "").strip() or None,
     )
     session.add(deadline)
+    defect.due_date = deadline.due_date
+    if defect.status in {"open", "assessed"}:
+        defect.status = "deadline_set"
     session.commit()
     session.refresh(deadline)
     return deadline
@@ -704,6 +756,18 @@ def create_notification(
         status="open",
     )
     session.add(notification)
+    session.commit()
+    session.refresh(notification)
+    return notification
+
+
+def update_notification_status(session: Session, notification_id: int, new_status: str) -> InspNotification:
+    notification = session.get(InspNotification, notification_id)
+    if notification is None:
+        raise ValueError("Benachrichtigung nicht gefunden")
+    next_status = new_status.strip().lower()
+    _validate_transition(notification.status, next_status, NOTIFICATION_STATUS_TRANSITIONS, "Benachrichtigung")
+    notification.status = next_status
     session.commit()
     session.refresh(notification)
     return notification

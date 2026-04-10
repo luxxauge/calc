@@ -46,6 +46,7 @@ from elektrocalc.services.inspection import (
     create_customer,
     create_distribution_report,
     create_defect,
+    update_defect_status,
     create_inspection_order,
     create_measurement,
     create_measurement_set,
@@ -53,6 +54,7 @@ from elektrocalc.services.inspection import (
     create_portal_release,
     create_report,
     create_task,
+    update_task_status,
     create_tenant,
     create_invoice,
     update_invoice_total,
@@ -67,6 +69,7 @@ from elektrocalc.services.inspection import (
     create_approval_step,
     update_approval_step_status,
     create_notification,
+    update_notification_status,
     create_inspection_cycle,
     create_backup_run,
     create_thermography_entry,
@@ -363,6 +366,9 @@ def test_next_five_blocks_deadline_approval_notification_cycle_backup():
     backup = create_backup_run(s, tenant.id, "ok", "/backups/t1.tar.zst", "2026-04-07T10:30:00")
 
     assert ddl.defect_id == defect.id
+    defect_refetched = s.get(InspDefect, defect.id)
+    assert defect_refetched.status == "deadline_set"
+    assert defect_refetched.due_date.isoformat() == "2026-12-31"
     assert step.status == "approved"
     assert note.related_id == defect.id
     assert note.related_type == "defect"
@@ -446,3 +452,36 @@ def test_restore_test_rejects_invalid_status():
         assert "passed|failed" in str(exc)
     else:
         raise AssertionError("Expected ValueError for invalid restore-test status")
+
+
+def test_defect_task_notification_status_workflows():
+    s = _make_session()
+    tenant = create_tenant(s, "T1")
+    customer = create_customer(s, tenant.id, "C1")
+    obj = create_object(s, customer.id, "S1", "Obj 1")
+    order = create_inspection_order(s, obj.id, "Wiederholungsprüfung")
+    defect = create_defect(s, order.id, "Klemmstelle lose", None)
+    task = create_task(s, tenant.id, "Nachziehen", obj.id, defect.id, None)
+    note = create_notification(s, tenant.id, "Info", "Bitte prüfen", None, None)
+
+    defect = update_defect_status(s, defect.id, "assessed")
+    defect = update_defect_status(s, defect.id, "follow_up")
+    defect = update_defect_status(s, defect.id, "closed")
+    assert defect.status == "closed"
+
+    task = update_task_status(s, task.id, "in_progress")
+    task = update_task_status(s, task.id, "done")
+    task = update_task_status(s, task.id, "archived")
+    assert task.status == "archived"
+
+    note = update_notification_status(s, note.id, "acknowledged")
+    note = update_notification_status(s, note.id, "resolved")
+    note = update_notification_status(s, note.id, "archived")
+    assert note.status == "archived"
+
+    try:
+        update_notification_status(s, note.id, "open")
+    except ValueError as exc:
+        assert "nicht erlaubt" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for invalid notification rollback transition")
