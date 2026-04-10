@@ -95,3 +95,16 @@ Keine externen CDNs. Alles lokal.
 ## v2.1 – Variantenvergleich Export
 - CSV Export des Variantenvergleichs (/lv/{doc_id}/compare.csv)
 - PDF Export vorbereitet (Platzhalter)
+
+## Mandantenfähige Prüfsoftware (MVP-1 Fundament)
+- UI: `/inspection`
+- Enthält den objektzentrierten Kernfluss aus dem Lastenheft: Mandant -> Kunde -> Standort/Objekt -> Verteilung -> Prüfauftrag -> Mangel/Bericht.
+- Prüfaufträge können Verteilungen explizit zugeordnet werden (Tabelle `insp_inspection_order_distribution`) für Hauptbericht/Teilbericht-Logik.
+- Neue Datenbasis inkl. Mandantentrennung in Tabellenpräfix `insp_` (Alembic Revisionen `0012inspectionmvp`, `0013inspectionorderdist`).
+- Zusätzlich umgesetzt (nächste Module): Termin-/Einsatzplanung, Messprotokoll-Engine (Messsatz/Messwert), Aufgabenmodul sowie Portal-Freigaben mit Formularen in `/inspection`.
+- Logische Verknüpfungen: Teilbericht je Verteilung nur bei passender Prüfauftrag-Verteilungszuordnung; Portalfreigaben prüfen Kundenbezug des Zielobjekts (z.B. Bericht/Mangel/Objekt).
+- Kaufmännischer Einstieg: Rechnungsanlage, Statusfluss und Änderungsstopp des Betrags nach Finalisierung.
+- Weitere Module: Geräteverwaltung, DMS-Dokumentbezug, Kommunikationslogik und Audit-Log mit Erfassungsformularen im Inspection-Dashboard.
+- Freigabe-/Finalisierungslogik erweitert: Status-Workflows für Prüfauftrag und Bericht; Messwerte/Teilberichte werden nach Finalisierung gesperrt.
+- Nächste 5 Blöcke umgesetzt: Mängelfristen, Freigabeschritte, Benachrichtigungen, Prüfzyklen und Backup-Run-Logging.
+- Nächste 6 Module umgesetzt: Thermografie, Gerätekalibrierungen, Nummernkreise, Zahlungseinträge, Datenaufbewahrungsregeln und Restore-Tests.

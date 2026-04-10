@@ -1,0 +1,447 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Prüfsoftware (MVP-1 Fundament)</h1>
+{% if error %}
+<p style="color:#a00; font-weight:600;">Fehler: {{ error }}</p>
+{% endif %}
+
+<section>
+  <h2>Mandant anlegen</h2>
+  <form method="post" action="/inspection/tenants/create">
+    <input name="name" placeholder="Mandant" required>
+    <button type="submit">Mandant speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Kunde anlegen</h2>
+  <form method="post" action="/inspection/customers/create">
+    <select name="tenant_id" required>
+      {% for t in tenants %}<option value="{{t.id}}">{{t.name}}</option>{% endfor %}
+    </select>
+    <input name="name" placeholder="Kunde" required>
+    <button type="submit">Kunde speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Objekt anlegen</h2>
+  <form method="post" action="/inspection/objects/create">
+    <select name="customer_id" required>
+      {% for c in customers %}<option value="{{c.id}}">#{{c.id}} {{c.name}}</option>{% endfor %}
+    </select>
+    <input name="site_name" placeholder="Standort" required>
+    <input name="object_name" placeholder="Objekt" required>
+    <button type="submit">Objekt speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Verteilung anlegen</h2>
+  <form method="post" action="/inspection/distributions/create">
+    <select name="object_id" required>
+      {% for o in objects %}<option value="{{o.id}}">#{{o.id}} {{o.name}}</option>{% endfor %}
+    </select>
+    <input name="label" placeholder="Verteilung (z.B. UV-1)" required>
+    <button type="submit">Verteilung speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Prüfauftrag anlegen</h2>
+  <form method="post" action="/inspection/orders/create">
+    <select name="object_id" required>
+      {% for o in objects %}<option value="{{o.id}}">#{{o.id}} {{o.name}}</option>{% endfor %}
+    </select>
+    <input name="reason" placeholder="Prüfanlass" required>
+    <button type="submit">Prüfauftrag speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Prüfauftrag-Status</h2>
+  <form method="post" action="/inspection/orders/status">
+    <select name="order_id" required>
+      {% for o in orders %}<option value="{{o.id}}">#{{o.id}} {{o.reason}} ({{o.status}})</option>{% endfor %}
+    </select>
+    <select name="new_status" required>
+      <option value="planned">planned</option>
+      <option value="in_progress">in_progress</option>
+      <option value="technical_done">technical_done</option>
+      <option value="finalized">finalized</option>
+      <option value="archived">archived</option>
+    </select>
+    <button type="submit">Status setzen</button>
+  </form>
+</section>
+
+<section>
+  <h2>Verteilungen einem Prüfauftrag zuordnen</h2>
+  <form method="post" action="/inspection/order-distributions/create">
+    <select name="order_id" required>
+      {% for o in orders %}<option value="{{o.id}}">#{{o.id}} {{o.reason}}</option>{% endfor %}
+    </select>
+    <select name="distribution_id" required>
+      {% for d in distributions %}<option value="{{d.id}}">#{{d.id}} {{d.label}}</option>{% endfor %}
+    </select>
+    <button type="submit">Zuordnung speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Mangel anlegen</h2>
+  <form method="post" action="/inspection/defects/create">
+    <select name="order_id" required>
+      {% for o in orders %}<option value="{{o.id}}">#{{o.id}} {{o.reason}}</option>{% endfor %}
+    </select>
+    <input name="title" placeholder="Mangel" required>
+    <input name="due_date" type="date">
+    <button type="submit">Mangel speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Termin- und Einsatzplanung</h2>
+  <form method="post" action="/inspection/appointments/create">
+    <select name="order_id" required>
+      {% for o in orders %}<option value="{{o.id}}">#{{o.id}} {{o.reason}}</option>{% endfor %}
+    </select>
+    <input name="starts_at" type="datetime-local" required>
+    <input name="ends_at" type="datetime-local">
+    <button type="submit">Termin speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Messprotokoll-Engine: Messsatz</h2>
+  <form method="post" action="/inspection/measurement-sets/create">
+    <select name="order_id" required>
+      {% for o in orders %}<option value="{{o.id}}">#{{o.id}} {{o.reason}}</option>{% endfor %}
+    </select>
+    <input name="title" placeholder="Messsatz (z.B. RCD-Test UV-1)" required>
+    <button type="submit">Messsatz speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Messprotokoll-Engine: Messwert</h2>
+  <form method="post" action="/inspection/measurements/create">
+    <select name="measurement_set_id" required>
+      {% for ms in measurement_sets %}<option value="{{ms.id}}">#{{ms.id}} {{ms.title}}</option>{% endfor %}
+    </select>
+    <input name="point_label" placeholder="Messpunkt" required>
+    <input name="measured_value" placeholder="Messwert" required>
+    <input name="unit" placeholder="Einheit (z.B. Ω, V)" required>
+    <button type="submit">Messwert speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Bericht anlegen</h2>
+  <form method="post" action="/inspection/reports/create">
+    <select name="order_id" required>
+      {% for o in orders %}<option value="{{o.id}}">#{{o.id}} {{o.reason}}</option>{% endfor %}
+    </select>
+    <input name="title" placeholder="Berichtstitel" required>
+    <button type="submit">Bericht speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Bericht-Status</h2>
+  <form method="post" action="/inspection/reports/status">
+    <select name="report_id" required>
+      {% for r in reports %}<option value="{{r.id}}">#{{r.id}} {{r.title}} ({{r.status}})</option>{% endfor %}
+    </select>
+    <select name="new_status" required>
+      <option value="for_approval">for_approval</option>
+      <option value="approved">approved</option>
+      <option value="finalized">finalized</option>
+      <option value="published">published</option>
+      <option value="archived">archived</option>
+    </select>
+    <button type="submit">Status setzen</button>
+  </form>
+</section>
+
+<section>
+  <h2>Teilbericht je Verteilung</h2>
+  <form method="post" action="/inspection/distribution-reports/create">
+    <select name="report_id" required>
+      {% for r in reports %}<option value="{{r.id}}">#{{r.id}} {{r.title}}</option>{% endfor %}
+    </select>
+    <select name="distribution_id" required>
+      {% for d in distributions %}<option value="{{d.id}}">#{{d.id}} {{d.label}}</option>{% endfor %}
+    </select>
+    <input name="summary" placeholder="Kurzfazit Teilbericht">
+    <button type="submit">Teilbericht speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Aufgabenmodul</h2>
+  <form method="post" action="/inspection/tasks/create">
+    <select name="tenant_id" required>
+      {% for t in tenants %}<option value="{{t.id}}">#{{t.id}} {{t.name}}</option>{% endfor %}
+    </select>
+    <input name="title" placeholder="Aufgabe" required>
+    <select name="object_id">
+      <option value="">(optional) Objekt</option>
+      {% for o in objects %}<option value="{{o.id}}">#{{o.id}} {{o.name}}</option>{% endfor %}
+    </select>
+    <select name="defect_id">
+      <option value="">(optional) Mangel</option>
+      {% for d in defects %}<option value="{{d.id}}">#{{d.id}} {{d.title}}</option>{% endfor %}
+    </select>
+    <select name="report_id">
+      <option value="">(optional) Bericht</option>
+      {% for r in reports %}<option value="{{r.id}}">#{{r.id}} {{r.title}}</option>{% endfor %}
+    </select>
+    <button type="submit">Aufgabe speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Kundenportal-Freigabe</h2>
+  <form method="post" action="/inspection/portal-releases/create">
+    <select name="customer_id" required>
+      {% for c in customers %}<option value="{{c.id}}">#{{c.id}} {{c.name}}</option>{% endfor %}
+    </select>
+    <input name="release_type" placeholder="Typ (report|defect|document)" required>
+    <input name="target_id" type="number" min="1" placeholder="Fachobjekt-ID" required>
+    <button type="submit">Freigabe speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Kaufmännisch: Rechnung anlegen</h2>
+  <form method="post" action="/inspection/invoices/create">
+    <select name="order_id" required>
+      {% for o in orders %}<option value="{{o.id}}">#{{o.id}} {{o.reason}}</option>{% endfor %}
+    </select>
+    <input name="total_cent" type="number" min="0" placeholder="Betrag in Cent" required>
+    <button type="submit">Rechnung speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Kaufmännisch: Rechnungsbetrag ändern</h2>
+  <form method="post" action="/inspection/invoices/total">
+    <select name="invoice_id" required>
+      {% for i in invoices %}<option value="{{i.id}}">#{{i.id}} Status={{i.status}} Betrag={{i.total_cent}}</option>{% endfor %}
+    </select>
+    <input name="total_cent" type="number" min="0" placeholder="Neuer Betrag in Cent" required>
+    <button type="submit">Betrag aktualisieren</button>
+  </form>
+</section>
+
+<section>
+  <h2>Kaufmännisch: Rechnungsstatus</h2>
+  <form method="post" action="/inspection/invoices/status">
+    <select name="invoice_id" required>
+      {% for i in invoices %}<option value="{{i.id}}">#{{i.id}} Status={{i.status}}</option>{% endfor %}
+    </select>
+    <select name="new_status" required>
+      <option value="freigegeben">freigegeben</option>
+      <option value="finalisiert">finalisiert</option>
+      <option value="versendet">versendet</option>
+      <option value="bezahlt">bezahlt</option>
+      <option value="korrigiert">korrigiert</option>
+      <option value="storniert">storniert</option>
+      <option value="archiviert">archiviert</option>
+    </select>
+    <button type="submit">Status setzen</button>
+  </form>
+</section>
+
+<section>
+  <h2>Geräteverwaltung</h2>
+  <form method="post" action="/inspection/devices/create">
+    <select name="tenant_id" required>
+      {% for t in tenants %}<option value="{{t.id}}">#{{t.id}} {{t.name}}</option>{% endfor %}
+    </select>
+    <input name="name" placeholder="Gerätename" required>
+    <input name="serial_no" placeholder="Seriennummer">
+    <input name="calibration_due" type="date">
+    <button type="submit">Gerät speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>DMS: Dokument erfassen</h2>
+  <form method="post" action="/inspection/documents/create">
+    <select name="tenant_id" required>
+      {% for t in tenants %}<option value="{{t.id}}">#{{t.id}} {{t.name}}</option>{% endfor %}
+    </select>
+    <input name="file_name" placeholder="Dateiname.pdf" required>
+    <input name="category" placeholder="Kategorie (report, image, invoice)">
+    <input name="visibility" placeholder="Sichtbarkeit (internal, portal)">
+    <select name="object_id"><option value="">(optional) Objekt</option>{% for o in objects %}<option value="{{o.id}}">#{{o.id}} {{o.name}}</option>{% endfor %}</select>
+    <select name="inspection_order_id"><option value="">(optional) Prüfauftrag</option>{% for o in orders %}<option value="{{o.id}}">#{{o.id}} {{o.reason}}</option>{% endfor %}</select>
+    <select name="defect_id"><option value="">(optional) Mangel</option>{% for d in defects %}<option value="{{d.id}}">#{{d.id}} {{d.title}}</option>{% endfor %}</select>
+    <select name="report_id"><option value="">(optional) Bericht</option>{% for r in reports %}<option value="{{r.id}}">#{{r.id}} {{r.title}}</option>{% endfor %}</select>
+    <button type="submit">Dokument speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Kommunikationseintrag</h2>
+  <form method="post" action="/inspection/communication/create">
+    <select name="tenant_id" required>
+      {% for t in tenants %}<option value="{{t.id}}">#{{t.id}} {{t.name}}</option>{% endfor %}
+    </select>
+    <input name="direction" placeholder="internal|inbound|outbound" value="internal">
+    <select name="task_id"><option value="">(optional) Aufgabe</option>{% for t in tasks %}<option value="{{t.id}}">#{{t.id}} {{t.title}}</option>{% endfor %}</select>
+    <select name="customer_id"><option value="">(optional) Kunde</option>{% for c in customers %}<option value="{{c.id}}">#{{c.id}} {{c.name}}</option>{% endfor %}</select>
+    <input name="message" placeholder="Nachricht / Rückfrage" required>
+    <button type="submit">Eintrag speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Mängel-Fristenblock</h2>
+  <form method="post" action="/inspection/defect-deadlines/create">
+    <select name="defect_id" required>
+      {% for d in defects %}<option value="{{d.id}}">#{{d.id}} {{d.title}}</option>{% endfor %}
+    </select>
+    <input name="due_date" type="date" required>
+    <input name="note" placeholder="Frist-Hinweis">
+    <button type="submit">Frist speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Freigabeschritte</h2>
+  <form method="post" action="/inspection/approval-steps/create">
+    <select name="tenant_id" required>
+      {% for t in tenants %}<option value="{{t.id}}">#{{t.id}} {{t.name}}</option>{% endfor %}
+    </select>
+    <input name="target_type" placeholder="report|invoice|inspection_order" required>
+    <input name="target_id" type="number" min="1" placeholder="Target-ID" required>
+    <input name="required_role" placeholder="admin|office|inspector" required>
+    <button type="submit">Freigabeschritt anlegen</button>
+  </form>
+  <form method="post" action="/inspection/approval-steps/status">
+    <select name="step_id" required>
+      {% for s in approval_steps %}<option value="{{s.id}}">#{{s.id}} {{s.target_type}} {{s.target_id}} ({{s.status}})</option>{% endfor %}
+    </select>
+    <select name="new_status" required>
+      <option value="pending">pending</option>
+      <option value="approved">approved</option>
+      <option value="rejected">rejected</option>
+    </select>
+    <button type="submit">Freigabestatus setzen</button>
+  </form>
+</section>
+
+<section>
+  <h2>Benachrichtigungen</h2>
+  <form method="post" action="/inspection/notifications/create">
+    <select name="tenant_id" required>
+      {% for t in tenants %}<option value="{{t.id}}">#{{t.id}} {{t.name}}</option>{% endfor %}
+    </select>
+    <input name="title" placeholder="Titel" required>
+    <input name="message" placeholder="Nachricht" required>
+    <input name="related_type" placeholder="optional: defect|task|report">
+    <input name="related_id" type="number" min="1" placeholder="optional: ID">
+    <button type="submit">Benachrichtigung speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Prüfzyklen</h2>
+  <form method="post" action="/inspection/cycles/create">
+    <select name="object_id" required>
+      {% for o in objects %}<option value="{{o.id}}">#{{o.id}} {{o.name}}</option>{% endfor %}
+    </select>
+    <input name="interval_months" type="number" min="1" value="48" required>
+    <input name="next_due_date" type="date" required>
+    <button type="submit">Prüfzyklus speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Backup-Run-Log</h2>
+  <form method="post" action="/inspection/backups/create">
+    <select name="tenant_id" required>
+      {% for t in tenants %}<option value="{{t.id}}">#{{t.id}} {{t.name}}</option>{% endfor %}
+    </select>
+    <input name="status" placeholder="ok|failed" value="ok">
+    <input name="location" placeholder="Backup-Pfad">
+    <input name="finished_at" type="datetime-local">
+    <button type="submit">Backup-Run speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Thermografie</h2>
+  <form method="post" action="/inspection/thermography/create">
+    <select name="object_id" required>{% for o in objects %}<option value="{{o.id}}">#{{o.id}} {{o.name}}</option>{% endfor %}</select>
+    <select name="defect_id"><option value="">(optional) Mangel</option>{% for d in defects %}<option value="{{d.id}}">#{{d.id}} {{d.title}}</option>{% endfor %}</select>
+    <input name="image_ref" placeholder="Bildreferenz" required>
+    <input name="max_temp_c" placeholder="Max °C">
+    <button type="submit">Thermografie speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Gerätekalibrierung</h2>
+  <form method="post" action="/inspection/calibrations/create">
+    <select name="device_id" required>{% for d in measuring_devices %}<option value="{{d.id}}">#{{d.id}} {{d.name}}</option>{% endfor %}</select>
+    <input name="calibrated_at" type="date" required>
+    <input name="valid_until" type="date" required>
+    <input name="certificate_ref" placeholder="Zertifikatsreferenz">
+    <button type="submit">Kalibrierung speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Nummernkreise</h2>
+  <form method="post" action="/inspection/number-sequences/create">
+    <select name="tenant_id" required>{% for t in tenants %}<option value="{{t.id}}">#{{t.id}} {{t.name}}</option>{% endfor %}</select>
+    <input name="scope" placeholder="scope (invoice|report)" required>
+    <input name="prefix" placeholder="Präfix (z.B. RE-)">
+    <button type="submit">Nummernkreis speichern</button>
+  </form>
+  <form method="post" action="/inspection/number-sequences/issue">
+    <select name="sequence_id" required>{% for n in number_sequences %}<option value="{{n.id}}">#{{n.id}} {{n.scope}} next={{n.next_number}}</option>{% endfor %}</select>
+    <button type="submit">Nächste Nummer vergeben</button>
+  </form>
+</section>
+
+<section>
+  <h2>Zahlungseinträge</h2>
+  <form method="post" action="/inspection/payments/create">
+    <select name="invoice_id" required>{% for i in invoices %}<option value="{{i.id}}">#{{i.id}} {{i.status}} {{i.total_cent}}</option>{% endfor %}</select>
+    <input name="amount_cent" type="number" min="0" required>
+    <button type="submit">Zahlung buchen</button>
+  </form>
+</section>
+
+<section>
+  <h2>Datenaufbewahrung</h2>
+  <form method="post" action="/inspection/retention-rules/create">
+    <select name="tenant_id" required>{% for t in tenants %}<option value="{{t.id}}">#{{t.id}} {{t.name}}</option>{% endfor %}</select>
+    <input name="data_type" placeholder="data_type (report|document)" required>
+    <input name="retention_days" type="number" min="1" value="3650" required>
+    <input name="delete_mode" placeholder="archive|delete" value="archive">
+    <button type="submit">Regel speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Restore-Tests</h2>
+  <form method="post" action="/inspection/restore-tests/create">
+    <select name="tenant_id" required>{% for t in tenants %}<option value="{{t.id}}">#{{t.id}} {{t.name}}</option>{% endfor %}</select>
+    <select name="backup_run_id"><option value="">(optional) Backup-Run</option>{% for b in backup_runs %}<option value="{{b.id}}">#{{b.id}} {{b.status}}</option>{% endfor %}</select>
+    <input name="status" placeholder="passed|failed" value="passed">
+    <input name="notes" placeholder="Restore-Test-Notiz">
+    <button type="submit">Restore-Test speichern</button>
+  </form>
+</section>
+
+<section>
+  <h2>Übersicht</h2>
+  <p>Mandanten: {{ tenants|length }} | Kunden: {{ customers|length }} | Objekte: {{ objects|length }} | Verteilungen: {{ distributions|length }} | Prüfaufträge: {{ orders|length }} | Verteilungszuordnungen: {{ order_distribution_links|length }} | Termine: {{ appointments|length }} | Messsätze: {{ measurement_sets|length }} | Messwerte: {{ measurements|length }} | Mängel: {{ defects|length }} | Mängelfristen: {{ defect_deadlines|length }} | Berichte: {{ reports|length }} | Teilberichte: {{ distribution_reports|length }} | Freigabeschritte: {{ approval_steps|length }} | Aufgaben: {{ tasks|length }} | Rechnungen: {{ invoices|length }} | Zahlungen: {{ payment_entries|length }} | Portalfreigaben: {{ portal_releases|length }} | Geräte: {{ measuring_devices|length }} | Kalibrierungen: {{ device_calibrations|length }} | Thermografie: {{ thermography_entries|length }} | Dokumente: {{ documents|length }} | Kommunikation: {{ communication_entries|length }} | Benachrichtigungen: {{ notifications|length }} | Prüfzyklen: {{ inspection_cycles|length }} | Nummernkreise: {{ number_sequences|length }} | Retention-Regeln: {{ retention_rules|length }} | Restore-Tests: {{ restore_tests|length }} | Backup-Runs: {{ backup_runs|length }} | Audit-Logs: {{ audit_logs|length }}</p>
+</section>
+{% endblock %}
