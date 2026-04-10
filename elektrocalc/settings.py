@@ -1,9 +1,10 @@
 from __future__ import annotations
 from pathlib import Path
+import os
 
 APP_NAME = "ElektroCalc"
-DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 8765
+DEFAULT_HOST = os.getenv("ELEKTROCALC_HOST", "127.0.0.1")
+DEFAULT_PORT = int(os.getenv("ELEKTROCALC_PORT", "8765"))
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"

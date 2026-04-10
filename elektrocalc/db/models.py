@@ -199,6 +199,7 @@ class Project(Base):
     inputs: Mapped["ProjectInputs"] = relationship(back_populates="project", uselist=False, cascade="all, delete-orphan")
     plans: Mapped[list["Plan"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     calc_runs: Mapped[list["CalcRun"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    qty_mappings: Mapped[list["PlanQtyMapping"]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
 
 class ProjectInputs(Base):
@@ -759,3 +760,358 @@ class PlanQtyMapping(Base):
 
     project: Mapped["Project"] = relationship("Project", back_populates="qty_mappings")
 
+
+# -----------------------------
+# Mandantenfähige Prüfsoftware (MVP-1 Fundament)
+# -----------------------------
+
+class InspTenant(Base):
+    __tablename__ = "insp_tenant"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class InspCustomer(Base):
+    __tablename__ = "insp_customer"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class InspSite(Base):
+    __tablename__ = "insp_site"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("insp_customer.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+
+class InspObject(Base):
+    __tablename__ = "insp_object"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("insp_customer.id", ondelete="CASCADE"), nullable=False, index=True)
+    site_id: Mapped[int] = mapped_column(ForeignKey("insp_site.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+
+class InspDistribution(Base):
+    __tablename__ = "insp_distribution"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    object_id: Mapped[int] = mapped_column(ForeignKey("insp_object.id", ondelete="CASCADE"), nullable=False, index=True)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+
+
+class InspInspectionOrder(Base):
+    __tablename__ = "insp_inspection_order"
+    __table_args__ = (
+        CheckConstraint("status in ('draft','planned','in_progress','technical_done','finalized','archived')", name="ck_insp_order_status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    object_id: Mapped[int] = mapped_column(ForeignKey("insp_object.id", ondelete="CASCADE"), nullable=False, index=True)
+    reason: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class InspInspectionOrderDistribution(Base):
+    __tablename__ = "insp_inspection_order_distribution"
+    __table_args__ = (
+        UniqueConstraint("inspection_order_id", "distribution_id", name="uq_insp_order_distribution"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    inspection_order_id: Mapped[int] = mapped_column(ForeignKey("insp_inspection_order.id", ondelete="CASCADE"), nullable=False, index=True)
+    distribution_id: Mapped[int] = mapped_column(ForeignKey("insp_distribution.id", ondelete="CASCADE"), nullable=False, index=True)
+
+
+class InspAppointment(Base):
+    __tablename__ = "insp_appointment"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    inspection_order_id: Mapped[int] = mapped_column(ForeignKey("insp_inspection_order.id", ondelete="CASCADE"), nullable=False, index=True)
+    starts_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    ends_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class InspMeasurementSet(Base):
+    __tablename__ = "insp_measurement_set"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    inspection_order_id: Mapped[int] = mapped_column(ForeignKey("insp_inspection_order.id", ondelete="CASCADE"), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+
+
+class InspMeasurement(Base):
+    __tablename__ = "insp_measurement"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    measurement_set_id: Mapped[int] = mapped_column(ForeignKey("insp_measurement_set.id", ondelete="CASCADE"), nullable=False, index=True)
+    point_label: Mapped[str] = mapped_column(String(120), nullable=False)
+    measured_value: Mapped[str] = mapped_column(String(64), nullable=False)
+    unit: Mapped[str] = mapped_column(String(16), nullable=False, default="")
+
+
+class InspDefect(Base):
+    __tablename__ = "insp_defect"
+    __table_args__ = (
+        CheckConstraint("status in ('open','assessed','deadline_set','follow_up','rechecked','closed')", name="ck_insp_defect_status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    inspection_order_id: Mapped[int] = mapped_column(ForeignKey("insp_inspection_order.id", ondelete="CASCADE"), nullable=False, index=True)
+    object_id: Mapped[int] = mapped_column(ForeignKey("insp_object.id", ondelete="CASCADE"), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
+    due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+
+
+class InspReport(Base):
+    __tablename__ = "insp_report"
+    __table_args__ = (
+        CheckConstraint("status in ('draft','for_approval','approved','finalized','published','archived')", name="ck_insp_report_status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    inspection_order_id: Mapped[int] = mapped_column(ForeignKey("insp_inspection_order.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")
+
+
+class InspDistributionReport(Base):
+    __tablename__ = "insp_distribution_report"
+    __table_args__ = (
+        UniqueConstraint("report_id", "distribution_id", name="uq_insp_dist_report"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    report_id: Mapped[int] = mapped_column(ForeignKey("insp_report.id", ondelete="CASCADE"), nullable=False, index=True)
+    distribution_id: Mapped[int] = mapped_column(ForeignKey("insp_distribution.id", ondelete="CASCADE"), nullable=False, index=True)
+    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+class InspTask(Base):
+    __tablename__ = "insp_task"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    object_id: Mapped[Optional[int]] = mapped_column(ForeignKey("insp_object.id", ondelete="CASCADE"), nullable=True, index=True)
+    defect_id: Mapped[Optional[int]] = mapped_column(ForeignKey("insp_defect.id", ondelete="CASCADE"), nullable=True, index=True)
+    report_id: Mapped[Optional[int]] = mapped_column(ForeignKey("insp_report.id", ondelete="CASCADE"), nullable=True, index=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
+
+
+class InspInvoice(Base):
+    __tablename__ = "insp_invoice"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    inspection_order_id: Mapped[int] = mapped_column(ForeignKey("insp_inspection_order.id", ondelete="CASCADE"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")
+    total_cent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class InspPortalRelease(Base):
+    __tablename__ = "insp_portal_release"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("insp_customer.id", ondelete="CASCADE"), nullable=False, index=True)
+    release_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    target_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    released_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class InspMeasuringDevice(Base):
+    __tablename__ = "insp_measuring_device"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    serial_no: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    calibration_due: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
+
+
+class InspDocument(Base):
+    __tablename__ = "insp_document"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    object_id: Mapped[Optional[int]] = mapped_column(ForeignKey("insp_object.id", ondelete="CASCADE"), nullable=True, index=True)
+    inspection_order_id: Mapped[Optional[int]] = mapped_column(ForeignKey("insp_inspection_order.id", ondelete="CASCADE"), nullable=True, index=True)
+    defect_id: Mapped[Optional[int]] = mapped_column(ForeignKey("insp_defect.id", ondelete="CASCADE"), nullable=True, index=True)
+    report_id: Mapped[Optional[int]] = mapped_column(ForeignKey("insp_report.id", ondelete="CASCADE"), nullable=True, index=True)
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    category: Mapped[str] = mapped_column(String(64), nullable=False, default="general")
+    visibility: Mapped[str] = mapped_column(String(32), nullable=False, default="internal")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class InspCommunicationEntry(Base):
+    __tablename__ = "insp_communication_entry"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    task_id: Mapped[Optional[int]] = mapped_column(ForeignKey("insp_task.id", ondelete="CASCADE"), nullable=True, index=True)
+    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("insp_customer.id", ondelete="CASCADE"), nullable=True, index=True)
+    direction: Mapped[str] = mapped_column(String(16), nullable=False, default="internal")
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class InspAuditLog(Base):
+    __tablename__ = "insp_audit_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    actor: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    action: Mapped[str] = mapped_column(String(120), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    entity_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class InspDefectDeadline(Base):
+    __tablename__ = "insp_defect_deadline"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    defect_id: Mapped[int] = mapped_column(ForeignKey("insp_defect.id", ondelete="CASCADE"), nullable=False, index=True)
+    due_date: Mapped[date] = mapped_column(Date, nullable=False)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class InspApprovalStep(Base):
+    __tablename__ = "insp_approval_step"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    target_type: Mapped[str] = mapped_column(String(32), nullable=False)  # report|invoice|inspection_order
+    target_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    required_role: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class InspNotification(Base):
+    __tablename__ = "insp_notification"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    related_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    related_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class InspInspectionCycle(Base):
+    __tablename__ = "insp_inspection_cycle"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    object_id: Mapped[int] = mapped_column(ForeignKey("insp_object.id", ondelete="CASCADE"), nullable=False, index=True)
+    interval_months: Mapped[int] = mapped_column(Integer, nullable=False, default=48)
+    next_due_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
+
+
+class InspBackupRun(Base):
+    __tablename__ = "insp_backup_run"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="ok")
+    location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
+class InspThermographyEntry(Base):
+    __tablename__ = "insp_thermography_entry"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    object_id: Mapped[int] = mapped_column(ForeignKey("insp_object.id", ondelete="CASCADE"), nullable=False, index=True)
+    defect_id: Mapped[Optional[int]] = mapped_column(ForeignKey("insp_defect.id", ondelete="CASCADE"), nullable=True, index=True)
+    image_ref: Mapped[str] = mapped_column(String(255), nullable=False)
+    max_temp_c: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class InspDeviceCalibration(Base):
+    __tablename__ = "insp_device_calibration"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    measuring_device_id: Mapped[int] = mapped_column(ForeignKey("insp_measuring_device.id", ondelete="CASCADE"), nullable=False, index=True)
+    calibrated_at: Mapped[date] = mapped_column(Date, nullable=False)
+    valid_until: Mapped[date] = mapped_column(Date, nullable=False)
+    certificate_ref: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+
+class InspNumberSequence(Base):
+    __tablename__ = "insp_number_sequence"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "scope", name="uq_insp_number_sequence_scope"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    scope: Mapped[str] = mapped_column(String(64), nullable=False)
+    prefix: Mapped[str] = mapped_column(String(16), nullable=False, default="")
+    next_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+
+class InspPaymentEntry(Base):
+    __tablename__ = "insp_payment_entry"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("insp_invoice.id", ondelete="CASCADE"), nullable=False, index=True)
+    amount_cent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="booked")
+    booked_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class InspDataRetentionRule(Base):
+    __tablename__ = "insp_data_retention_rule"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    data_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    retention_days: Mapped[int] = mapped_column(Integer, nullable=False, default=3650)
+    delete_mode: Mapped[str] = mapped_column(String(32), nullable=False, default="archive")
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class InspRestoreTest(Base):
+    __tablename__ = "insp_restore_test"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("insp_tenant.id", ondelete="CASCADE"), nullable=False, index=True)
+    backup_run_id: Mapped[Optional[int]] = mapped_column(ForeignKey("insp_backup_run.id", ondelete="SET NULL"), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="passed")
+    tested_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
